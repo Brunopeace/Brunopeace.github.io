@@ -3,52 +3,563 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de UUID</title>
-    <style>
-        body {
-            background-color: #000000;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-        #uuid {
-            color: #ffffff;
-            font-size: 1.5em;
-            margin: 20px 0;
-            word-break: break-all;
-        }
-    </style>
+    <link rel="icon" href="img/icon512.png">
+    <title>Gerenciador de clientes</title>
+    <link rel="stylesheet" type="text/css" href="css/estilo.css">
+    <link rel="manifest" href="manifest.json">
 </head>
+
+<!-- Tela de Loader Interativa -->
+<div id="loading">
+  <div class="loader-box">
+    <div class="glow-spinner"></div>
+    <div class="typing-text">
+<span>Carregando</span><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+    </div>
+  </div>
+</div>
+    
 <body>
-    <h1>Gerador de UUID</h1>
-    <button onclick="displayUUID()">Gerar UUID</button>
-    <div id="uuid">Clique no botão para gerar um UUID.</div>
 
-    <script>
-        function generateUUID() {
-            // Função para gerar um UUID v4
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        }
+    <img src="img/logo-padrao.png" class="logo">
 
-        function displayUUID() {
-            let uuid = localStorage.getItem('uuid');
-            if (!uuid) {
-                uuid = generateUUID();
-                localStorage.setItem('uuid', uuid);
-            }
-            document.getElementById('uuid').innerText = uuid;
-        }
+    <div class="flex-container">
+        <div class="drop">
+            <p>BRUNO</p>
+        </div>
+        
+        <div class="drop">
+            <p>FABIANA</p>
+        </div>
+        
+        <div class="drop">
+            <div class="loading-coracao">
+            <span></span>
+        </div>
+        </div>
+    </div>
 
-        // Exibe o UUID ao carregar a página, se já estiver armazenado
-        window.onload = function() {
-            displayUUID();
-        }
-    </script>
+<h1><strong>Painel de vencimento</strong></h1>
+    
+    <button id="backToTop" title="Voltar ao Topo">
+
+<button onclick="toggleDarkMode()" class="meio" class="slide-in">Claro Escuro</button><button id="backup" onclick="exportarClientes()">Backup Clientes</button><br><br>
+
+    <div class="input-container slide-in">
+<input type="file" id="importarClientes" style="display: none;"/>
+<label for="importarClientes" class="button">Importar Backup <img src="img/diskette.png" class="diskette"></label><br>
+</div>
+
+<div id="modalCadastro" class="modal">
+  <div class="modal-conteudo">
+    <span class="fechar" onclick="fecharModalCadastro()">&times;</span>
+    
+    <h2>Cadastrar Cliente</h2>
+    
+    <div class="input-container">
+      <label for="inputNome" class="modal1">Nome do cliente <img src="img/face.png" class="face"></label>
+      <input type="text" id="inputNome" required placeholder="Nome do cliente">
+    </div>
+
+    <div class="input-container">
+      <label for="inputTelefone">Telefone do cliente <img src="img/cell.png" class="cell"></label>
+      <input type="tel" id="inputTelefone" required placeholder="Telefone do cliente">
+    </div>
+
+    <div class="input-container">
+      <label for="inputData">Data de vencimento <img src="img/calendario.png" class="calendario"></label>
+      <input type="date" id="inputData" required>
+    </div>
+    
+    <div class="input-container slide-in">
+  <label for="inputHora">Hora de vencimento <img src="img/relogio.png" class="relogio"></label>
+  <input type="time" id="inputHora" required>
+</div>
+    
+    <button onclick="adicionarCliente()">Adicionar Cliente</button>
+  </div>
+</div>
+    
+<button id="btnExcluirSelecionados" onclick="excluirClientesSelecionados()">Excluir Seleção</button><button onclick="abrirModalCadastro()" class="slide-in btn-modal">Cadastrar Cliente</button><br><br>
+
+<div id="modalEditar" class="modal">
+  <div class="modal-conteudo">
+    <span class="fechar" onclick="fecharModalEditar()">&times;</span>
+    <h2>Editar Cliente</h2>
+    
+    <input type="hidden" id="editNomeAntigo">
+
+    <div class="input-container">
+      <label for="editNome">Nome do cliente<img src="img/face.png" class="face"></label>
+      <input type="text" id="editNome" placeholder="Nome de usuário" required>
+    </div>
+
+    <div class="input-container">
+      <label for="editTelefone">Telefone do cliente<img src="img/cell.png" class="cell"></label>
+       <input type="tel" id="editTelefone" placeholder="Telefone" required>
+    </div>
+
+    <div class="input-container">
+     <label for="editData">Data de Vencimento<img src="img/calendario.png" class="calendario"></label>
+      <input type="date" id="editData" required>
+    </div>
+    
+    <div class="input-container">
+     <label for="editHora">Hora de Vencimento<img src="img/relogio.png" class="relogio"></label>
+      <input type="time" id="editHora">
+    </div>
+    
+    <button onclick="salvarEdicaoCliente()">Salvar Alterações</button>
+  </div>
+</div>
+
+<div id="feedback" style="display: none;"></div>
+<div id="infoClientes2" class="slide-in"></div><br>
+    <div id="infoClientes" class="slide-in"></div>
+    <div class="table-container slide-in">
+           
+<br>
+<button id="toggleLixeira" onclick="alternarLixeira()">Abrir Lixeira</button>
+<br>
+<label for="inputPesquisar" class="label-pesquisa">Pesquisar Cliente <img src="img/lupa.png" class="lupa"></label>
+        <input type="text" id="inputPesquisar" oninput="pesquisarCliente()" placeholder="Por nome / Telefone">
+
+<div id="containerLixeira" style="display: none;">
+    <div id="quantidadeClientesLixeira"></div>
+    
+    <div id="lixeira">
+    <div id="feedbackR" style="display: none;"></div>
+<button id="restaurarSelecionados" onclick="restaurarSelecionados()">Restaurar /Sel</button>
+<button id="esvaziarLixeira" onclick="esvaziarLixeira()">Esvaziar Lixeira</button>
+        <input type="text" id="pesquisarLixeira" placeholder="Pesquisar na lixeira" oninput="pesquisarClientesLixeira()">
+        <table id="tabelaLixeira">
+
+            <thead>
+                <tr>
+                    <th>
+    
+<input type="checkbox" id="selecionarTodos" onclick="toggleSelecionarTodos(this)">
+
+                    </th>
+                </tr>
+            </thead>
+            
+            <tbody id="clientList">
+<!-- Clientes da lixeira serão carregados aqui -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+        <table>
+    <thead>
+        <tr>
+         <th><input type="checkbox" id="select-all"></th>
+            <th>Nome</th>
+            <th>Telefone</th>
+            <th>Data de Vencimento</th>
+            <th>Hora</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody id="corpoTabela">
+<!-- Linhas de clientes adicionadas dinamicamente -->
+    </tbody>
+</table>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<footer>
+        © 2025 Desenvolvedor <a href="https://wa.me/5581982258462?text=%2AOl%C3%A1%2C+fiquei+interessado+nesse+seu+aplicativo+web%2C+quanto+custa+%3F%2A"><strong>Bruno-Silva</strong></a>
+</footer>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCw38sezt3TWmFIuUXFD3mPAj2ZPF6ZD4o",
+    authDomain: "gerenciador-eeb96.firebaseapp.com",
+    databaseURL: "https://gerenciador-eeb96-default-rtdb.firebaseio.com",
+    projectId: "gerenciador-eeb96",
+    storageBucket: "gerenciador-eeb96.appspot.com",
+    messagingSenderId: "560345055072",
+    appId: "1:560345055072:web:9048475b7ac90a7f43e805"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const ThemeManager = {
+            // Configurações dos temas
+    config: [
+      { 
+        name: 'natal', 
+        // Natal: de 23 a 28 de Dezembro
+        check: (d, m) => m === 12 && (d >= 23 && d <= 28), 
+        action: () => criarNeve() 
+      },
+      { 
+        name: 'ano-novo', 
+        // Ano Novo: de 31 de Dezembro até 05 de Janeiro
+        check: (d, m) => (m === 12 && d >= 31) || (m === 1 && d <= 5), 
+        action: () => criarFogos() 
+      },
+      { 
+        name: 'carnaval', 
+        // Carnaval: Todo o mês de Fevereiro
+        check: (d, m) => m === 2,
+        action: () => criarConfetes() 
+      },
+      { 
+        name: 'pascoa', 
+        // Páscoa: Março e Abril
+        check: (d, m) => m === 3 || m === 3,
+        action: () => criarPascoa() 
+      },
+      { 
+        name: 'sao-joao', 
+        // São João: Todo o mês de Junho
+        check: (d, m) => m === 6,
+        action: () => typeof criarSaoJoao === 'function' ? criarSaoJoao() : null
+      },
+      { 
+        name: 'halloween', 
+        // Halloween: Todo o mês de Outubro
+        check: (d, m) => m === 10,
+        action: () => criarHalloween()
+      }
+    ],
+
+
+    init() {
+      const hoje = new Date();
+      const dia = hoje.getDate();
+      const mes = hoje.getMonth() + 1;
+      const logo = document.querySelector('.logo');
+
+      // 1. Limpa temas anteriores dinamicamente
+      this.limparTemas();
+
+      // 2. Encontra o tema correspondente
+      const temaAtivo = this.config.find(tema => tema.check(dia, mes));
+
+      if (temaAtivo) {
+        this.aplicarTema(temaAtivo, logo);
+      } else if (logo) {
+        logo.src = 'img/logo-padrao.png';
+      }
+    },
+
+    limparTemas() {
+      const classesParaRemover = Array.from(document.body.classList)
+        .filter(c => c.startsWith('tema-'));
+      document.body.classList.remove(...classesParaRemover);
+    },
+
+    aplicarTema(tema, logo) {
+      document.body.classList.add(`tema-${tema.name}`);
+      
+      if (logo) {
+        logo.src = `img/logo-${tema.name}.png`;
+      }
+
+      if (typeof tema.action === 'function') {
+        tema.action();
+      }
+    }
+  };
+
+  ThemeManager.init();
+});
+
+// ❄️ FUNÇÃO DA NEVE
+function criarNeve() {
+  for (let i = 0; i < 40; i++) {
+    const snow = document.createElement("div");
+    snow.className = "neve";
+    snow.style.left = Math.random() * window.innerWidth + "px";
+    snow.style.animationDuration = (3 + Math.random() * 5) + "s";
+    snow.style.opacity = Math.random();
+    document.body.appendChild(snow);
+  }
+}
+
+//  Função ano novo 
+function criarFogos() {
+  const container = document.body;
+
+  const lancarFoguete = () => {
+    if (!document.body.classList.contains('tema-ano-novo')) return;
+
+    const x = Math.random() * 100; // Posição horizontal
+    const yExplosao = Math.random() * 40 + 10; // Altura da explosão (10% a 50% do topo)
+    const cor = `hsl(${Math.random() * 40 + 20}, 100%, 70%)`; // Tons de dourado/âmbar
+
+    const foguete = document.createElement("div");
+    foguete.className = "foguete-realista";
+    foguete.style.left = `${x}vw`;
+    foguete.style.setProperty('--cor', cor);
+    container.appendChild(foguete);
+
+    // O foguete sobe
+    setTimeout(() => {
+      explodir(x, yExplosao, cor);
+      foguete.remove();
+    }, 1000);
+  };
+
+  const explodir = (x, y, cor) => {
+    const fragmento = document.createDocumentFragment();
+    const qtdParticulas = 50; // Mais partículas para parecer com a foto
+
+    for (let i = 0; i < qtdParticulas; i++) {
+      const p = document.createElement("div");
+      p.className = "particula-realista";
+      
+      // Direções aleatórias para a explosão circular
+      const angle = Math.random() * Math.PI * 2;
+      const velocity = Math.random() * 150 + 50;
+      const tx = Math.cos(angle) * velocity;
+      const ty = Math.sin(angle) * velocity;
+
+      p.style.left = `${x}vw`;
+      p.style.top = `${y}vh`;
+      p.style.setProperty('--cor', cor);
+      p.style.setProperty('--tx', `${tx}px`);
+      p.style.setProperty('--ty', `${ty}px`);
+      
+      fragmento.appendChild(p);
+      setTimeout(() => p.remove(), 1500);
+    }
+    container.appendChild(fragmento);
+  };
+
+  // Intervalo de disparos
+  const interval = setInterval(() => {
+    if (!document.body.classList.contains('tema-ano-novo')) {
+      clearInterval(interval);
+      return;
+    }
+    lancarFoguete();
+  }, 2000);
+}
+
+//  Função carnaval
+
+function criarConfetes() {
+  const container = document.body;
+  const cores = ['#FF00FF', '#00FFFF', '#FFFF00', '#FF4500', '#ADFF2F', '#7B68EE'];
+
+  const gerarConfete = () => {
+    if (!document.body.classList.contains('tema-carnaval')) return;
+
+    const confete = document.createElement("div");
+    confete.className = "confete";
+    
+    const corAleatoria = cores[Math.floor(Math.random() * cores.length)];
+    const largura = Math.random() * 10 + 5;
+    const altura = Math.random() * 15 + 5;
+
+    Object.assign(confete.style, {
+      left: `${Math.random() * 100}vw`,
+      width: `${largura}px`,
+      height: `${altura}px`,
+      backgroundColor: corAleatoria,
+      position: 'fixed',
+      top: '-20px',
+      zIndex: '9999',
+      opacity: Math.random() + 0.5,
+      transform: `rotate(${Math.random() * 360}deg)`,
+      pointerEvents: 'none'
+    });
+
+    container.appendChild(confete);
+
+    // Animação de queda e balanço
+    const duracao = Math.random() * 3 + 2;
+    confete.animate([
+      { transform: `translate3d(0, 0, 0) rotate(0deg)`, opacity: 1 },
+      { transform: `translate3d(${Math.random() * 100 - 50}px, 105vh, 0) rotate(${Math.random() * 1000}deg)`, opacity: 0 }
+    ], {
+      duration: duracao * 1000,
+      easing: 'linear'
+    });
+
+    setTimeout(() => confete.remove(), duracao * 1000);
+  };
+
+  // Dispara confetes continuamente
+  const interval = setInterval(() => {
+    if (!document.body.classList.contains('tema-carnaval')) {
+      clearInterval(interval);
+      return;
+    }
+    for(let i=0; i<5; i++) gerarConfete(); // Gera em grupos para parecer mais cheio
+  }, 300);
+}
+
+function criarPascoa() {
+  const container = document.body;
+  const elementos = ['🥚', '🍫', '🐰', '🥕', '🐣'];
+
+  const gerarElemento = () => {
+    if (!document.body.classList.contains('tema-pascoa')) return;
+
+    const el = document.createElement("div");
+    el.className = "item-pascoa";
+    el.innerText = elementos[Math.floor(Math.random() * elementos.length)];
+    
+    const tamanho = Math.random() * 20 + 20; // Entre 20px e 40px
+
+    Object.assign(el.style, {
+      left: `${Math.random() * 100}vw`,
+      fontSize: `${tamanho}px`,
+      position: 'fixed',
+      top: '-50px',
+      zIndex: '9999',
+      cursor: 'default',
+      userSelect: 'none',
+      pointerEvents: 'none',
+      filter: 'drop-shadow(2px 2px 5px rgba(0,0,0,0.1))'
+    });
+
+    container.appendChild(el);
+
+    const duracao = Math.random() * 4 + 4; // Queda mais lenta e suave
+    
+    el.animate([
+      { transform: `translateY(0) rotate(0deg)`, opacity: 0 },
+      { opacity: 1, offset: 0.1 },
+      { transform: `translateY(105vh) rotate(${Math.random() * 360}deg)`, opacity: 0.8 }
+    ], {
+      duration: duracao * 1000,
+      easing: 'ease-in-out'
+    });
+
+    setTimeout(() => el.remove(), duracao * 1000);
+  };
+
+  const interval = setInterval(() => {
+    if (!document.body.classList.contains('tema-pascoa')) {
+      clearInterval(interval);
+      return;
+    }
+    gerarElemento();
+  }, 600); // Menos elementos que o carnaval para manter a suavidade
+}
+
+
+function criarHalloween() {
+  const container = document.body;
+  const elementos = ['👻', '🎃', '🦇', '🕷️', '💀', '🕸️'];
+
+  const gerarSusto = () => {
+    if (!document.body.classList.contains('tema-halloween')) return;
+
+    const el = document.createElement("div");
+    el.className = "item-halloween";
+    el.innerText = elementos[Math.floor(Math.random() * elementos.length)];
+    
+    const tamanho = Math.random() * 25 + 20;
+
+    Object.assign(el.style, {
+      left: `${Math.random() * 100}vw`,
+      fontSize: `${tamanho}px`,
+      position: 'fixed',
+      top: '-50px',
+      zIndex: '9999',
+      pointerEvents: 'none',
+      filter: 'drop-shadow(0 0 5px rgba(155, 89, 182, 0.5))' // Brilho roxo
+    });
+
+    container.appendChild(el);
+
+    const duracao = Math.random() * 3 + 3;
+    
+    // Animação com "tremor" (抖动)
+    el.animate([
+      { transform: `translate(0, 0) rotate(0deg)`, opacity: 0 },
+      { opacity: 1, offset: 0.2 },
+      { transform: `translate(-20px, 50vh) rotate(-20deg)`, offset: 0.5 },
+      { transform: `translate(20px, 105vh) rotate(20deg)`, opacity: 0 }
+    ], {
+      duration: duracao * 1000,
+      easing: 'ease-in'
+    });
+
+    setTimeout(() => el.remove(), duracao * 1000);
+  };
+
+  const interval = setInterval(() => {
+    if (!document.body.classList.contains('tema-halloween')) {
+      clearInterval(interval);
+      return;
+    }
+    gerarSusto();
+  }, 500);
+}
+
+function criarSaoJoao() {
+  const container = document.body;
+  const cores = ['#ffeb3b', '#f44336', '#2196f3', '#4caf50', '#ff9800'];
+  const emojis = ['🎈', '🔥', '🌽'];
+
+  const gerarEnfeite = () => {
+    if (!document.body.classList.contains('tema-sao-joao')) return;
+
+    const el = document.createElement("div");
+    
+    // Sorteia se será uma bandeirinha ou um emoji (balão/milho)
+    const ehBandeirinha = Math.random() > 0.3;
+
+    if (ehBandeirinha) {
+      el.className = "bandeirinha-junina";
+      el.style.backgroundColor = cores[Math.floor(Math.random() * cores.length)];
+    } else {
+      el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+      el.style.fontSize = "20px";
+    }
+
+    Object.assign(el.style, {
+      left: `${Math.random() * 100}vw`,
+      position: 'fixed',
+      top: '-40px',
+      zIndex: '9999',
+      pointerEvents: 'none'
+    });
+
+    container.appendChild(el);
+
+    const duracao = Math.random() * 3 + 4;
+    
+    // Animação de balanço (zigue-zague)
+    el.animate([
+      { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
+      { transform: `translate(-30px, 50vh) rotate(15deg)`, offset: 0.5 },
+      { transform: `translate(30px, 105vh) rotate(-15deg)`, opacity: 0 }
+    ], {
+      duration: duracao * 1000,
+      easing: 'ease-in-out'
+    });
+
+    setTimeout(() => el.remove(), duracao * 1000);
+  };
+
+  const interval = setInterval(() => {
+    if (!document.body.classList.contains('tema-sao-joao')) {
+      clearInterval(interval);
+      return;
+    }
+    gerarEnfeite();
+  }, 400);
+}
+</script>
+
+<script src="javascript/script.js"></script>
 </body>
 </html>
