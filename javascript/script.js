@@ -155,6 +155,18 @@ document.addEventListener("DOMContentLoaded", () => {
     exibirClientesRenovadosHoje();
     carregarDarkMode();
 
+    // --- LÓGICA DO BOTÃO DE RECUPERAÇÃO ---
+    const clientesLocais = carregarClientes(); 
+    const btnSync = document.getElementById('syncFirebase');
+
+    // Se a lista de clientes estiver vazia (limpou navegador), mostra o botão
+    if (!clientesLocais || clientesLocais.length === 0) {
+        if (btnSync) btnSync.style.display = "block";
+    } else {
+        if (btnSync) btnSync.style.display = "none";
+    }
+    // --------------------------------------
+
     // Input de importação
     const importarInput = document.getElementById("importarClientes");
     if (importarInput) {
@@ -1251,6 +1263,65 @@ document.getElementById('select-all').addEventListener('change', function() {
     });
 });
 
+// --- FUNÇÃO DE SINCRONIZAÇÃO COMPLETA ---
+async function sincronizarDoFirebase() {
+    if (!confirm("Isso irá baixar todos os clientes do banco de dados e atualizar seu dispositivo. Deseja continuar?")) {
+        return;
+    }
+
+    const btn = document.getElementById('syncFirebase');
+    const originalText = btn.innerText;
+    btn.innerText = "Sincronizando...";
+    btn.disabled = true;
+
+    try {
+        const snapshot = await firebase.database().ref('clientes').once('value');
+        const dadosFirebase = snapshot.val();
+
+        if (!dadosFirebase) {
+            alert("Nenhum dado encontrado no Firebase.");
+            btn.innerText = originalText;
+            btn.disabled = false;
+            return;
+        }
+
+        const novosClientes = [];
+
+        Object.keys(dadosFirebase).forEach(id => {
+            const clienteFb = dadosFirebase[id];
+            
+            // Tratamento da data: Converte "DD/MM/AAAA" para Objeto Date
+            let dataObjeto;
+            if (clienteFb.vencimento && typeof clienteFb.vencimento === 'string') {
+                const partesData = clienteFb.vencimento.split('/');
+                dataObjeto = new Date(partesData[2], partesData[1] - 1, partesData[0]);
+            } else {
+                dataObjeto = new Date();
+            }
+
+            novosClientes.push({
+                nome: id, 
+                telefone: clienteFb.telefone || "",
+                data: dataObjeto,
+                hora: clienteFb.hora || ""
+            });
+        });
+
+        salvarClientes(novosClientes);
+        alert(`Sucesso! ${novosClientes.length} clientes foram recuperados.`);
+        window.location.reload();
+
+    } catch (error) {
+        console.error("Erro ao sincronizar:", error);
+        alert("Erro ao puxar dados do Firebase.");
+    } finally {
+        if (btn) {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
+}
+
 function excluirClientesSelecionados() {
     const checkboxes = document.querySelectorAll('.cliente-checkbox:checked');
     const clientes = carregarClientes();
@@ -1305,13 +1376,15 @@ function atualizarDataNoFirebase(cliente) {
 
     return firebase.database().ref('clientes/' + id).set({
         vencimento: new Date(cliente.data).toLocaleDateString('pt-BR'),
-        telefone: cliente.telefone
+        telefone: cliente.telefone,
+        hora: cliente.hora || "" // <-- Adicionado para salvar a hora no Firebase
     }).then(() => {
         console.log("✅ Cliente atualizado no Firebase:", id);
     }).catch((error) => {
         console.error("❌ Erro ao atualizar cliente no Firebase:", error);
     });
 }
+
 
 function abrirModalCadastro() {
     document.getElementById("modalCadastro").style.display = "block";
