@@ -623,11 +623,14 @@ footer {
             color: #333;
         }
         tr:nth-child(even) {
-            background-color: #f9f9f9;
+            background-color: #616161;
         }
         
         tr:hover {
-            background-color: #a3ffcc;
+            background-color: #007a25;
+            color: #000000;
+            font-weight: bold;
+            transition: background-color 1.5s ease, color 1.5s ease, border-color 1.5s ease;
         }
 
         .orange {
