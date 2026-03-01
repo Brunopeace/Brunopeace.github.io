@@ -1564,6 +1564,25 @@ window.onclick = function(event) {
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const messaging = firebase.messaging();
 
 async function registrarToken() {
@@ -1608,13 +1627,41 @@ window.addEventListener("load", registrarToken);
 
 // Salvar token no Realtime Database
 function salvarTokenNoRealtime(token) {
+    const idDono = obterIdDono(); // Pega o id do dono (seu telefone)
+    
+    // Salva na lista global de dispositivos (útil para debug)
     firebase.database().ref("devices/" + token).set({
         token: token,
-        criadoEm: new Date().toISOString()
+        criadoEm: new Date().toISOString(),
+        dono: idDono
     });
 
-    console.log("✔ Token salvo no Firebase");
+    // Salva nas configurações do seu usuário
+    firebase.database().ref(`usuarios/${idDono}/config/fcm_token`).set(token);
+
+    console.log("✔ Token vinculado ao seu usuário no Firebase");
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function abrirModalEditar(nome, telefone, data, hora) {
     document.getElementById("editNomeAntigo").value = nome;
