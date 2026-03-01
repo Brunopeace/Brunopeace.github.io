@@ -3,26 +3,25 @@
 // ===============================
 
 if ("serviceWorker" in navigator) {
-window.addEventListener("load", () => {
-navigator.serviceWorker.register("service-worker.js") // sem "/"
-.then(reg => {
-console.log("✅ SW PRINCIPAL registrado:", reg);
+    window.addEventListener("load", () => {
+        // Registro do SW Principal do PWA
+        navigator.serviceWorker.register("service-worker.js")
+            .then(reg => {
+                console.log("✅ SW PRINCIPAL registrado:", reg);
 
-            // ===============================
-            // 2 — REGISTRAR O SW DO FIREBASE MESSAGING (CORRETO PARA GITHUB PAGES)
-            // ===============================
-            return navigator.serviceWorker.register("firebase-messaging/firebase-messaging-sw.js", {
-                scope: "firebase-messaging/" // sem "/"
+                // Registro do SW do Firebase na RAIZ
+                // Removendo o 'scope' ele assume a raiz por padrão
+                return navigator.serviceWorker.register("firebase-messaging-sw.js");
+            })
+            .then(reg2 => {
+                console.log("✔ SW Firebase Messaging registrado na raiz:", reg2);
+            })
+            .catch(err => {
+                console.error("❌ Erro ao registrar Service Workers:", err);
             });
-        })
-        .then(reg2 => {
-            console.log("✔ SW Firebase Messaging registrado:", reg2);
-        })
-        .catch(err => {
-            console.error("❌ Erro ao registrar Service Workers:", err);
-        });
     });
 }
+
    
   /* código para instalar o aplicativo */
   let deferredPrompt;
