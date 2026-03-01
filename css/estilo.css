@@ -1373,3 +1373,14 @@ body.dark-mode #modalEditar .modal-conteudo input {
   color: #ffeb3b;
   text-decoration: underline wavy #bf360c;
 }
+
+.firebase {
+    background: radial-gradient(circle, rgb(229, 72, 25), rgb(98, 1, 31));
+    width: 95%;
+    border-radius: 5px;
+}
+
+.firebase:hover {
+    background: radial-gradient(circle, rgb(97, 247, 208), rgb(52, 2, 157));
+    font-weight: bold;
+}
