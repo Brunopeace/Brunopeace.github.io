@@ -1642,6 +1642,46 @@ function salvarTokenNoRealtime(token) {
     console.log("✔ Token vinculado ao seu usuário no Firebase");
 }
 
+function verificarVencimentosENotificar() {
+    const clientes = carregarClientes(); // Sua função que busca do LocalStorage
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    clientes.forEach(cliente => {
+        let dataVencimento;
+        
+        // Converte "DD/MM/AAAA" para objeto Date
+        if (typeof cliente.data === 'string' && cliente.data.includes('/')) {
+            const [dia, mes, ano] = cliente.data.split('/');
+            dataVencimento = new Date(ano, mes - 1, dia);
+        } else {
+            dataVencimento = new Date(cliente.data);
+        }
+        dataVencimento.setHours(0, 0, 0, 0);
+
+        // Calcula a diferença
+        const diffMs = dataVencimento - hoje;
+        const diferencaDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        // Se faltarem exatamente 2 dias
+        if (diferencaDias === 2) {
+            enviarNotificacaoLocal(cliente.nome);
+        }
+    });
+}
+
+function enviarNotificacaoLocal(nomeCliente) {
+    if (Notification.permission === "granted") {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification("Vencimento em 2 dias! ⏳", {
+                body: `O cliente ${nomeCliente} está próximo do vencimento.`,
+                icon: "/img/icon192.png",
+                tag: `vencimento-${nomeCliente}`, // Evita repetir a mesma notificação
+                renotify: true
+            });
+        });
+    }
+}
 
 
 
