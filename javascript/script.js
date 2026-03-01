@@ -14,7 +14,7 @@ if ("serviceWorker" in navigator) {
                 return navigator.serviceWorker.register("firebase-messaging-sw.js");
             })
             .then(reg2 => {
-                console.log("✔ SW Firebase Messaging registrado na raiz:", reg2);
+                console.log("✅ SW Firebase Messaging registrado na raiz:", reg2);
             })
             .catch(err => {
                 console.error("❌ Erro ao registrar Service Workers:", err);
@@ -1563,25 +1563,6 @@ window.onclick = function(event) {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const messaging = firebase.messaging();
 
 async function registrarToken() {
@@ -1595,14 +1576,13 @@ async function registrarToken() {
             return;
         }
 
-        // ⚠️ REGISTRA O SW CORRETO DO FIREBASE MESSAGING
-        const swFirebase = await navigator.serviceWorker.register("/firebase-messaging/firebase-messaging-sw.js", {
-            scope: "/firebase-messaging/"
-        });
+        // ⚠️ REGISTRA O SW NA RAIZ (Essencial para GitHub Pages e para o Push funcionar)
+        // Removi a pasta /firebase-messaging/ pois o SW deve estar na raiz para ter escopo total
+        const swFirebase = await navigator.serviceWorker.register("firebase-messaging-sw.js");
 
         console.log("✔ SW Firebase Messaging carregado:", swFirebase);
 
-        // GENERATE TOKEN USANDO O SW CORRETO
+        // GERA O TOKEN USANDO O REGISTRO DO SW ACIMA
         const token = await messaging.getToken({
             vapidKey: "BLjysHYuYMCgWcARiaeByArVexcnPcBD5q57wcmqDuLx9fNgJAPfksen9mCE8Df7I_KCPhOPxD57SH6IHWof6qc",
             serviceWorkerRegistration: swFirebase
@@ -1615,14 +1595,23 @@ async function registrarToken() {
             return;
         }
 
+        // 1. Salva o token no seu banco de dados (na pasta do usuário)
         salvarTokenNoRealtime(token);
+
+        // 2. EXECUTA A VERIFICAÇÃO DE VENCIMENTOS (Nova alteração)
+        // Assim que o app abre e registra o token, ele já avisa se alguém vence em 2 dias
+        if (typeof verificarVencimentosENotificar === "function") {
+            verificarVencimentosENotificar();
+        }
 
     } catch (e) {
         console.error("❌ Erro ao registrar token:", e);
     }
 }
 
+// Garante que o registro aconteça ao carregar a página
 window.addEventListener("load", registrarToken);
+
 
 // Salvar token no Realtime Database
 function salvarTokenNoRealtime(token) {
@@ -1687,26 +1676,6 @@ function enviarNotificacaoLocal(nomeCliente) {
         });
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function abrirModalEditar(nome, telefone, data, hora) {
     document.getElementById("editNomeAntigo").value = nome;
