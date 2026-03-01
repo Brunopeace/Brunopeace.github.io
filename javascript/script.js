@@ -1628,19 +1628,25 @@ window.addEventListener("load", registrarToken);
 // Salvar token no Realtime Database
 function salvarTokenNoRealtime(token) {
     const idDono = obterIdDono(); // Pega o id do dono (seu telefone)
-    
-    // Salva na lista global de dispositivos (útil para debug)
-    firebase.database().ref("devices/" + token).set({
+
+    if (!idDono || idDono === "padrao") {
+        console.warn("⚠️ Token não salvo: ID do dono não identificado.");
+        return;
+    }
+
+    // Salva APENAS nas configurações do seu usuário
+    firebase.database().ref(`usuarios/${idDono}/config/fcm_token`).set({
         token: token,
-        criadoEm: new Date().toISOString(),
-        dono: idDono
+        criadoEm: new Date().toISOString()
+    })
+    .then(() => {
+        console.log("✔ Token vinculado exclusivamente ao seu usuário no Firebase");
+    })
+    .catch((error) => {
+        console.error("❌ Erro ao salvar token no usuário:", error);
     });
-
-    // Salva nas configurações do seu usuário
-    firebase.database().ref(`usuarios/${idDono}/config/fcm_token`).set(token);
-
-    console.log("✔ Token vinculado ao seu usuário no Firebase");
 }
+
 
 function verificarVencimentosENotificar() {
     const clientes = carregarClientes(); // Sua função que busca do LocalStorage
