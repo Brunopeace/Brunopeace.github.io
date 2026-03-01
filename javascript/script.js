@@ -131,7 +131,7 @@ function contarClientesLixeira() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Loader
+    // 1. Controle do Loader (Exibe apenas na primeira visita da sessão)
     const loading = document.getElementById("loading");
     const hasVisited = sessionStorage.getItem("hasVisited");
 
@@ -149,30 +149,69 @@ document.addEventListener("DOMContentLoaded", () => {
         esconderLoader();
     }
 
-    // Chamadas de inicialização
+    // 2. Chamadas de Inicialização Únicas
     carregarLixeiraPagina();
     exibirClientesAlterados();
     exibirClientesRenovadosHoje();
     carregarDarkMode();
+    verificarBackupDiario();
+    
+    // Inicializa a página e define o intervalo de atualização automática
+    if (typeof carregarPagina === "function") {
+        carregarPagina();
+        setInterval(carregarPagina, 30 * 1000); // Atualiza a cada 30 segundos
+    }
 
-    // --- LÓGICA DO BOTÃO DE RECUPERAÇÃO ---
-    const clientesLocais = carregarClientes(); 
+    // 3. Lógica de Identificação e Botão de Recuperação (Firebase por Telefone)
+    const clientesLocais = typeof carregarClientes === "function" ? carregarClientes() : []; 
     const btnSync = document.getElementById('syncFirebase');
+    const idDonoSalvo = localStorage.getItem("id_dono_app");
 
-    // Se a lista de clientes estiver vazia (limpou navegador), mostra o botão
+    // CENÁRIO A: Navegador Limpo (Sem clientes e sem ID de dono)
     if (!clientesLocais || clientesLocais.length === 0) {
-        if (btnSync) btnSync.style.display = "block";
-    } else {
+        if (btnSync) {
+            btnSync.style.display = "block";
+            btnSync.innerText = "Restaurar meus clientes (via Telefone) 🔄";
+        }
+    } 
+    // CENÁRIO B: App em uso, mas sem ID de dono (Configuração inicial)
+    else if (!idDonoSalvo) {
+        // Se há clientes mas não há ID, solicita o telefone para vincular os dados ao Firebase
+        setTimeout(() => {
+            if (typeof obterIdDono === "function") obterIdDono();
+        }, 1000);
         if (btnSync) btnSync.style.display = "none";
     }
-    // --------------------------------------
+    // CENÁRIO C: Tudo normal
+    else {
+        if (btnSync) btnSync.style.display = "none";
+    }
 
-    // Input de importação
+    // 4. Listeners de Eventos (Inputs, Checkboxes e Scroll)
+    
+    // Selecionar todos os checkboxes da tabela
+    const selectAll = document.getElementById('select-all');
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.cliente-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+
+    // Input de importação de arquivo JSON
     const importarInput = document.getElementById("importarClientes");
     if (importarInput) {
         importarInput.addEventListener("change", importarClientes);
     }
 
+    // Ativa a lógica de scroll (ex: botão voltar ao topo)
+    if (typeof window.onscroll === "function") {
+        window.onscroll();
+    }
+
+    // Renderização inicial da lista de clientes
     if (typeof displayClients === "function") {
         displayClients();
     }
@@ -203,17 +242,42 @@ window.addEventListener('load', carregarLixeiraPagina);
 function restaurarCliente(nome) {
     const lixeira = carregarLixeira();
     const clientes = carregarClientes();
-    const clienteIndex = lixeira.findIndex(c => c.nome === nome);
+    
+    // Busca o cliente na lixeira pelo nome
+    const clienteIndex = lixeira.findIndex(c => c.nome.toLowerCase() === nome.toLowerCase());
 
     if (clienteIndex !== -1) {
-const cliente = lixeira.splice(clienteIndex, 1)[0];
-        clientes.push(cliente);
+        // 1. Remove da lixeira e guarda o objeto do cliente
+        const clienteParaRestaurar = lixeira.splice(clienteIndex, 1)[0];
+
+        // 2. Adiciona de volta à lista principal de clientes
+        clientes.push(clienteParaRestaurar);
+        
+        // 3. Salva as alterações localmente
         salvarClientes(clientes);
         salvarLixeira(lixeira);
-        carregarLixeiraPagina();
-        atualizarInfoClientes();
-        atualizarTabelaClientes();
-        window.location.reload();
+
+        // 4. SINCRONIZA COM O FIREBASE
+        // Isso fará com que o cliente "reapareça" no banco de dados
+        atualizarDataNoFirebase(clienteParaRestaurar)
+            .then(() => {
+                console.log("✅ Cliente restaurado com sucesso no Firebase!");
+                
+                // 5. Atualiza a interface
+                carregarLixeiraPagina();
+                atualizarInfoClientes();
+                atualizarTabelaClientes();
+                
+                // Recarrega para garantir que tudo esteja atualizado
+                window.location.reload();
+            })
+            .catch(err => {
+                console.error("❌ Erro ao restaurar no Firebase:", err);
+                // Mesmo com erro no Firebase, recarregamos para mostrar o local
+                window.location.reload();
+            });
+    } else {
+        alert("Cliente não encontrado na lixeira.");
     }
 }
 
@@ -235,11 +299,6 @@ function salvarClientes(clientes) {
     localStorage.setItem('clientes', JSON.stringify(clientes));
 }
 
-window.addEventListener('load', function() {
-    const clientes = carregarClientes();
-    clientes.forEach(cliente => adicionarLinhaTabela(cliente.nome, cliente.telefone, cliente.data, cliente.hora || ""));
-});
-
 function alternarLixeira() {
 const containerLixeira = document.getElementById('containerLixeira');
 const toggleButton = document.getElementById('toggleLixeira');
@@ -255,47 +314,63 @@ toggleButton.textContent = 'Abrir Lixeira';
 function excluirCliente(nome) {
     const clientes = carregarClientes();
     const clienteIndex = clientes.findIndex(c => c.nome.toLowerCase() === nome.toLowerCase());
+
     if (clienteIndex !== -1) {
-        const somExclusao = new Audio('sounds/exclusao.mp3');
-        somExclusao.play();
-        const cliente = clientes.splice(clienteIndex, 1)[0];
+        // 1. Som de exclusão (opcional)
+        try {
+            const somExclusao = new Audio('sounds/exclusao.mp3');
+            somExclusao.play();
+        } catch (e) { console.log("Som não encontrado"); }
+
+        // 2. Remove do array principal e guarda o cliente removido
+        const clienteRemovido = clientes.splice(clienteIndex, 1)[0];
+        
+        // 3. Salva a lista principal atualizada (sem o cliente) no LocalStorage
         salvarClientes(clientes);
 
-        const lixeira = carregarLixeira();
-        lixeira.push(cliente);
+        // 4. MOVE PARA A LIXEIRA
+        const lixeira = carregarLixeira() || [];
+        lixeira.push(clienteRemovido);
         salvarLixeira(lixeira);
 
-        // ✅ Remove também da lista de "clientes renovados hoje"
+        // 5. Limpezas adicionais (Renovados e Firebase)
         removerDeRenovadosHoje(nome);
-
-        // ✅ Exclui do Firebase também
-        excluirClienteDoFirebase(nome);
-
-        const linhaCliente = document.querySelector(`tr[data-nome="${nome}"]`);
-        if (linhaCliente) {
-            linhaCliente.classList.add('desintegrate');
-            setTimeout(() => {
-                linhaCliente.remove();
-                atualizarInfoClientes();
-                carregarLixeiraPagina();
-                exibirClientesRenovadosHoje(); // atualiza lista na UI
-            }, 500);
-        }
+        
+        // Chamamos a função de remover do Firebase
+        // IMPORTANTE: Use o nome correto da sua função (removerClienteDoFirebase ou excluirClienteDoFirebase)
+        removerClienteDoFirebase(nome).then(() => {
+            console.log("✅ Removido do Firebase e movido para lixeira");
+            
+            // 6. Efeito visual e recarregamento
+            const linhaCliente = document.querySelector(`tr[data-nome="${nome.toLowerCase()}"]`);
+            if (linhaCliente) {
+                linhaCliente.classList.add('desintegrate');
+                setTimeout(() => {
+                    window.location.reload(); // Recarrega para atualizar tudo
+                }, 500);
+            } else {
+                window.location.reload();
+            }
+        }).catch(err => {
+            console.error("Erro ao excluir do Firebase:", err);
+            window.location.reload();
+        });
     }
 }
 
-function excluirClienteDoFirebase(nome) {
-    const id = nome.toLowerCase()
-        .replace(/\s+/g, '') // remove espaços
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-        .replace(/[.#$/[\]]/g, ''); // remove caracteres inválidos
+function removerClienteDoFirebase(nomeCliente) {
+    const idDono = obterIdDono(); // Pega o telefone (ex: 81982258462)
+    const idCliente = gerarIdFirebase(nomeCliente);
+    
+    // Caminho exato na nova estrutura: usuarios -> TELEFONE -> clientes -> NOME
+    const caminho = 'usuarios/' + idDono + '/clientes/' + idCliente;
 
-    firebase.database().ref('clientes/' + id).remove()
+    return firebase.database().ref(caminho).remove()
         .then(() => {
-            console.log(`🗑️ Cliente removido do Firebase: ${id}`);
+            console.log("✅ Removido do Firebase:", nomeCliente);
         })
         .catch((error) => {
-            console.error("❌ Erro ao remover cliente do Firebase:", error);
+            console.error("❌ Erro ao remover do Firebase:", error);
         });
 }
 
@@ -320,32 +395,61 @@ function toggleSelecionarTodos(source) {
     });
 }
 
-function restaurarSelecionados() {
+async function restaurarSelecionados() {
     const checkboxes = document.querySelectorAll('.checkboxCliente:checked');
     const lixeira = carregarLixeira();
     let clientes = carregarClientes();
-    let clientesRestaurados = false;
+    
+    let promessasFirebase = []; // Array para guardar as tarefas do Firebase
+    let nomesRestaurados = [];
+
     checkboxes.forEach(checkbox => {
         const nome = checkbox.getAttribute('data-nome');
-        const clienteIndex = lixeira.findIndex(c => c.nome === nome);
-        if (clienteIndex !== -1 && !clientes.some(cliente => cliente.nome === nome)) {
+        const clienteIndex = lixeira.findIndex(c => c.nome.toLowerCase() === nome.toLowerCase());
+        
+        // Verifica se o cliente existe na lixeira e se NÃO existe um igual na lista ativa
+        if (clienteIndex !== -1 && !clientes.some(c => c.nome.toLowerCase() === nome.toLowerCase())) {
             const cliente = lixeira.splice(clienteIndex, 1)[0];
+            
+            // Adiciona à lista local
             clientes.push(cliente);
-            clientesRestaurados = true;
+            nomesRestaurados.push(cliente.nome);
+
+            // Prepara a tarefa para o Firebase
+            if (typeof atualizarDataNoFirebase === "function") {
+                promessasFirebase.push(atualizarDataNoFirebase(cliente));
+            }
         }
     });
 
-    salvarClientes(clientes);
-    salvarLixeira(lixeira);
-    carregarLixeiraPagina();
-    atualizarInfoClientes();
-    atualizarTabelaClientes();
-    carregarPagina();
+    if (nomesRestaurados.length > 0) {
+        // 1. Salva as listas atualizadas no LocalStorage
+        salvarClientes(clientes);
+        salvarLixeira(lixeira);
 
-    if (clientesRestaurados) {
-        exibirFeedback("Clientes restaurados com sucesso");
+        try {
+            // 2. Aguarda todos os clientes serem salvos no Firebase
+            await Promise.all(promessasFirebase);
+            
+            exibirFeedback(`${nomesRestaurados.length} cliente(s) restaurado(s) com sucesso no Firebase! ✅`);
+            
+            // 3. Atualiza a interface
+            carregarLixeiraPagina();
+            atualizarInfoClientes();
+            atualizarTabelaClientes();
+            
+            // Recarrega para limpar os checkboxes e atualizar tudo
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+
+        } catch (error) {
+            console.error("Erro ao sincronizar restauração com Firebase:", error);
+            exibirFeedback("Erro ao sincronizar com Firebase, mas os dados locais foram atualizados.");
+            window.location.reload();
+        }
     } else {
-        exibirFeedback("Nenhum cliente foi restaurado. Clientes com o mesmo nome já existem.");
+        exibirFeedback("Nenhum cliente restaurado. (Já existem na lista ou nenhum selecionado)");
     }
 }
 
@@ -367,49 +471,65 @@ function adicionarCliente() {
     const nomeInput = document.getElementById('inputNome');
     const telefoneInput = document.getElementById('inputTelefone');
     const dataInput = document.getElementById('inputData');
-    const horaInput = document.getElementById('inputHora'); // ⏰ novo campo
+    const horaInput = document.getElementById('inputHora'); 
 
     const nome = nomeInput.value.trim();
     const telefone = telefoneInput.value.trim();
     const data = dataInput.value;
-    const hora = horaInput ? horaInput.value : ""; // garante que não quebre caso não exista
+    const hora = horaInput ? horaInput.value : ""; 
+
+    // Log para conferência técnica
+    console.log("Capturando dados para envio:", { nome, telefone, data, hora });
 
     let erro = false;
-
     erro |= !validarCampo(nomeInput, nome, "Nome do cliente não pode estar vazio.");
-    erro |= !validarCampo(telefoneInput, telefone, "Telefone inválido. Deve conter 11 dígitos.", validarTelefone);
-    erro |= !validarCampo(dataInput, data, "Data inválida. Escolha uma data válida.", validarData);
+    erro |= !validarCampo(telefoneInput, telefone, "Telefone inválido (11 dígitos).", validarTelefone);
+    erro |= !validarCampo(dataInput, data, "Data inválida. Escolha uma data de vencimento.", validarData);
 
     if (erro) return;
 
-    const nomeNormalizado = nome.toLowerCase(); // ⬅️ Nome sempre em minúsculo
+    const nomeNormalizado = nome.toLowerCase(); 
     const clientes = carregarClientes();
 
-    const clienteExistente = clientes.some(cliente =>
-        cliente.nome.toLowerCase() === nomeNormalizado
-    );
-
-    if (clienteExistente) {
+    // Verifica se já existe para evitar duplicados locais
+    if (clientes.some(c => c.nome.toLowerCase() === nomeNormalizado)) {
         alert("Cliente com o mesmo nome já existe.");
         return;
     }
 
-    const dataFormatada = new Date(data);
-    const dataVencimento = calcularDataVencimento(dataFormatada);
+    // Gerar a data de vencimento formatada (String)
+    const dataVencimentoFormatada = calcularDataVencimento(new Date(data));
 
+    // Criamos o objeto completo. 
+    // IMPORTANTE: O campo 'data' aqui será enviado como 'vencimento' no Firebase
     const novoCliente = {
         nome: nomeNormalizado,
-        telefone,
-        data: dataVencimento,
-        hora // salva a hora junto
+        telefone: telefone,
+        data: dataVencimentoFormatada, // Ex: "30/03/2026"
+        hora: hora 
     };
 
+    // 1. Salva localmente
     clientes.push(novoCliente);
     salvarClientes(clientes);
 
-    atualizarDataNoFirebase(novoCliente).then(() => {
-        window.location.reload();
-    });
+    // 2. Limpa a tabela visualmente para evitar o "bug" de ver 2 clientes iguais
+    const tabela = document.getElementById('corpoTabela');
+    if (tabela) {
+        tabela.innerHTML = ''; 
+    }
+
+    // 3. Sincroniza com o Firebase
+    // Certifique-se que atualizarDataNoFirebase use cliente.data para preencher o vencimento
+    atualizarDataNoFirebase(novoCliente)
+        .then(() => {
+            console.log("✅ Sucesso: Nome, Telefone, Vencimento e Hora sincronizados.");
+            window.location.reload(); 
+        })
+        .catch((err) => {
+            console.error("❌ Falha na sincronização:", err);
+            window.location.reload(); 
+        });
 }
 
 function validarCampo(input, valor, mensagemErro, validador = v => v.trim() !== "") {
@@ -506,8 +626,10 @@ function calcularDataVencimento(data) {
         dataVencimento = new Date(ano, mes + 1, 0);
     }
 
-    return dataVencimento;
+    // RETORNE COMO STRING PARA O FIREBASE ACEITAR
+    return dataVencimento.toLocaleDateString('pt-BR'); 
 }
+
 
 function gerarIdFirebase(nome) {
     return nome.toLowerCase()
@@ -534,9 +656,18 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
     celulaTelefone.innerText = telefone;
 
     const celulaData = novaLinha.insertCell(3);
-    celulaData.innerText = new Date(data).toLocaleDateString('pt-BR');
+    
+    // --- CORREÇÃO PARA EVITAR "INVALID DATE" ---
+    // Se a data já for uma string formatada (ex: "28/03/2026"), usamos direto.
+    // Caso contrário (objeto Date), formatamos agora.
+    if (typeof data === 'string' && data.includes('/')) {
+        celulaData.innerText = data;
+    } else {
+        celulaData.innerText = new Date(data).toLocaleDateString('pt-BR');
+    }
 
     // Atualiza cor da célula com data + hora
+    // Certifique-se que sua função atualizarCorCelulaData também foi atualizada para ler strings
     atualizarCorCelulaData(celulaData, data, hora);
 
     const celulaHora = novaLinha.insertCell(4);
@@ -544,15 +675,12 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
 
     const celulaAcoes = novaLinha.insertCell(5);
 
-        // 🔧 Botão de editar cliente
+    // 🔧 Botão de editar cliente
     celulaAcoes.appendChild(criarBotao("Editar", function () {
-        // Capturamos os dados atuais da linha da tabela
         const nomeAtual = nome; 
         const telefoneAtual = telefone;
-        const dataFormatada = celulaData.innerText; // Ex: "25/12/2023"
+        const dataFormatada = celulaData.innerText; 
         const horaAtual = celulaHora.innerText;
-
-        // Abre o modal de edição (esta função deve estar no final do seu script.js)
         abrirModalEditar(nomeAtual, telefoneAtual, dataFormatada, horaAtual);
     }));
 
@@ -579,42 +707,38 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
     botaoWhatsApp.classList.add('WhatsApp');
   
     botaoWhatsApp.onclick = function () {
-    const nomeCliente = nome.toLowerCase();
-    const dataVencimento = celulaData.innerText.trim();
-    const saudacao = obterSaudacao();
-    const telefoneCliente = telefone ? telefone.replace(/\D/g, '') : '';
+        const nomeCliente = nome.toLowerCase();
+        const dataVencimento = celulaData.innerText.trim();
+        const saudacao = obterSaudacao();
+        const telefoneCliente = telefone ? telefone.replace(/\D/g, '') : '';
 
-    if (!telefoneCliente) {
-        alert('Número de telefone inválido.');
-        return;
+        if (!telefoneCliente) {
+            alert('Número de telefone inválido.');
+            return;
+        }
+
+        const mensagem = criarMensagemWhatsApp(saudacao, dataVencimento);
+        abrirWhatsApp(telefoneCliente, mensagem);
+        marcarMensagemEnviada(nomeCliente, botaoWhatsApp);
+    };
+
+    function marcarMensagemEnviada(nomeCliente, botao) {
+        const hojeLocal = new Date().toLocaleDateString('pt-BR');
+        let mensagens = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: hojeLocal, nomes: [] };
+
+        if (mensagens.data !== hojeLocal) {
+            mensagens = { data: hojeLocal, nomes: [] }; 
+        }
+
+        if (!mensagens.nomes.includes(nomeCliente)) {
+            mensagens.nomes.push(nomeCliente);
+            localStorage.setItem('mensagensEnviadasHoje', JSON.stringify(mensagens));
+        }
+
+        botao.innerText = "✅ Enviado";
+        botao.disabled = true;
+        botao.style.opacity = "0.6";
     }
-
-    const mensagem = criarMensagemWhatsApp(saudacao, dataVencimento);
-    abrirWhatsApp(telefoneCliente, mensagem);
-
-    // ✅ Marca como enviado
-    marcarMensagemEnviada(nomeCliente, botaoWhatsApp);
-};
-
-// 🔹 Função para registrar que o cliente já recebeu mensagem hoje
-function marcarMensagemEnviada(nomeCliente, botao) {
-    const hoje = new Date().toLocaleDateString('pt-BR');
-    let mensagens = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: hoje, nomes: [] };
-
-    if (mensagens.data !== hoje) {
-        mensagens = { data: hoje, nomes: [] }; // novo dia, limpa histórico
-    }
-
-    if (!mensagens.nomes.includes(nomeCliente)) {
-        mensagens.nomes.push(nomeCliente);
-        localStorage.setItem('mensagensEnviadasHoje', JSON.stringify(mensagens));
-    }
-
-    // muda o botão visualmente
-    botao.innerText = "✅ Enviado";
-    botao.disabled = true;
-    botao.style.opacity = "0.6";
-}
 
     conteudoDropdown.appendChild(botaoWhatsApp);
 
@@ -645,29 +769,23 @@ function marcarMensagemEnviada(nomeCliente, botao) {
     botaoTelegram.classList.add('telegram');
     botaoTelegram.onclick = function () {
         const dataVencimentoDestacada = celulaData.innerText;
-        const horaAtual = new Date().getHours();
-        let saudacao;
-        if (horaAtual < 12) saudacao = "bom dia";
-        else if (horaAtual < 18) saudacao = "boa tarde";
-        else saudacao = "boa noite";
-
+        const saudacao = obterSaudacao();
         const mensagem = encodeURIComponent(
             `Olá ${saudacao}, seu plano de canais está vencendo, com data de vencimento dia ${dataVencimentoDestacada}. Caso queira renovar após esta data, favor entrar em contato. \n\n PIX EMAIL \n\n brunopeaceandlove60@gmail.com`
         );
-
         const numeroTelefone = telefone.replace(/\D/g, '');
         const urlTelegramShare = `https://t.me/share/url?url=tel:+${numeroTelefone}&text=${mensagem}`;
         window.open(urlTelegramShare, '_blank');
     };
     
- // Verifica se o cliente já recebeu mensagem hoje
-const mensagens = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: "", nomes: [] };
-const hoje = new Date().toLocaleDateString('pt-BR');
-if (mensagens.data === hoje && mensagens.nomes.includes(nome.toLowerCase())) {
-    botaoWhatsApp.innerText = "✅ Enviado";
-    botaoWhatsApp.disabled = true;
-    botaoWhatsApp.style.opacity = "0.6";
-}
+    // Verifica se o cliente já recebeu mensagem hoje para manter o botão desativado ao carregar
+    const mensagensEnviadas = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: "", nomes: [] };
+    const hojeCheck = new Date().toLocaleDateString('pt-BR');
+    if (mensagensEnviadas.data === hojeCheck && mensagensEnviadas.nomes.includes(nome.toLowerCase())) {
+        botaoWhatsApp.innerText = "✅ Enviado";
+        botaoWhatsApp.disabled = true;
+        botaoWhatsApp.style.opacity = "0.6";
+    }
     
     conteudoDropdown.appendChild(botaoTelegram);
     dropdownDiv.appendChild(botaoDropdown);
@@ -685,33 +803,50 @@ function criarBotao(texto, acao) {
 }
 
 function atualizarCorCelulaData(celulaData, data, hora) {
-    let dataVencimento = new Date(data);
+    let dataVencimento;
 
-    // Se tiver hora cadastrada, ajusta a hora
-    if (hora) {
+    // --- CORREÇÃO PARA DATA EM FORMATO STRING (DD/MM/AAAA) ---
+    if (typeof data === 'string' && data.includes('/')) {
+        const [dia, mes, ano] = data.split('/');
+        // O mês no JavaScript começa em 0 (Janeiro = 0, Março = 2)
+        dataVencimento = new Date(ano, mes - 1, dia);
+    } else {
+        // Se for um objeto Date ou formato ISO, usa o padrão
+        dataVencimento = new Date(data);
+    }
+
+    // Se tiver hora cadastrada, ajusta a hora para precisão no cálculo
+    if (hora && hora.includes(':')) {
         const [h, m] = hora.split(":");
         dataVencimento.setHours(parseInt(h), parseInt(m), 0, 0);
     } else {
-        // Caso não tenha hora, considera final do dia
+        // Caso não tenha hora, considera o final do dia para não vencer antes do tempo
         dataVencimento.setHours(23, 59, 59, 999);
     }
 
     const agora = new Date();
 
-    // Remove classes antigas
+    // Remove classes de cores antigas antes de aplicar a nova
     celulaData.classList.remove('red', 'yellow', 'orange');
 
+    // 1. Verifica se já passou do tempo (Vencido)
     if (agora > dataVencimento) {
-        celulaData.classList.add('red'); // vencido
+        celulaData.classList.add('red'); 
     } else {
-        // Calcular diferença em dias
-        const diffMs = dataVencimento.setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0);
-        const diferencaDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        // 2. Cálculo de quantos dias faltam (ignorando as horas para o cálculo de dias inteiros)
+        const dataVencimentoZerada = new Date(dataVencimento);
+        dataVencimentoZerada.setHours(0, 0, 0, 0);
+
+        const hojeZerado = new Date();
+        hojeZerado.setHours(0, 0, 0, 0);
+
+        const diffMs = dataVencimentoZerada - hojeZerado;
+        const diferencaDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
         if (diferencaDias === 0) {
-            celulaData.classList.add('yellow'); // vence hoje
-        } else if (diferencaDias === 2) {
-            celulaData.classList.add('orange'); // faltam 2 dias
+            celulaData.classList.add('yellow'); // Vence hoje
+        } else if (diferencaDias <= 2 && diferencaDias > 0) {
+            celulaData.classList.add('orange'); // Faltam 1 ou 2 dias
         }
     }
 }
@@ -731,34 +866,32 @@ function renovarCliente(nome) {
 
 function registrarClienteRenovadoHoje(nomeCliente) {
     const hoje = new Date().toLocaleDateString('pt-BR');
-    let clientesHoje = JSON.parse(localStorage.getItem('clientesRenovadosHoje')) || { data: hoje, nomes: [] };
+    // Busca os dados ou cria um objeto novo se não existir
+    let dados = JSON.parse(localStorage.getItem('clientesRenovadosHoje')) || { data: hoje, nomes: [] };
 
-    if (clientesHoje.data === hoje && !clientesHoje.nomes.includes(nomeCliente)) {
-        clientesHoje.nomes.push(nomeCliente);
-    } else if (clientesHoje.data !== hoje) {
-        clientesHoje = { data: hoje, nomes: [nomeCliente] };
+    // Se o dia mudou, reseta a lista para o novo dia
+    if (dados.data !== hoje) {
+        dados = { data: hoje, nomes: [] };
     }
 
-    localStorage.setItem('clientesRenovadosHoje', JSON.stringify(clientesHoje));
+    // Adiciona o nome apenas se ele ainda não estiver na lista (evita duplicados)
+    if (!dados.nomes.includes(nomeCliente)) {
+        dados.nomes.push(nomeCliente);
+        localStorage.setItem('clientesRenovadosHoje', JSON.stringify(dados));
+    }
 }
 
 function exibirClientesRenovadosHoje() {
     const hoje = new Date().toLocaleDateString('pt-BR');
-
-    // Recupera os dados do localStorage
-    let clientesHoje = JSON.parse(localStorage.getItem('clientesRenovadosHoje'));
-
-    // Se não existir ou for de outro dia, cria do zero
-    if (!clientesHoje || clientesHoje.data !== hoje) {
-        clientesHoje = { data: hoje, nomes: [] };
-        localStorage.setItem('clientesRenovadosHoje', JSON.stringify(clientesHoje));
-    }
-
     const campoClientesRenovados = document.getElementById('infoClientes');
+    
+    if (!campoClientesRenovados) return; // Segurança caso o ID não exista no HTML
 
-    // Exibe os nomes que já estavam salvos
-    if (clientesHoje.nomes && clientesHoje.nomes.length > 0) {
-        const listaClientes = clientesHoje.nomes
+    let dados = JSON.parse(localStorage.getItem('clientesRenovadosHoje'));
+
+    // Verifica se existem nomes registrados para HOJE
+    if (dados && dados.data === hoje && dados.nomes.length > 0) {
+        const listaClientes = dados.nomes
             .map(nome => `<li class="cliente-scroll" data-nome="${nome.toLowerCase()}">${nome}</li>`)
             .join('');
 
@@ -771,26 +904,35 @@ function exibirClientesRenovadosHoje() {
             adicionarEventoScrollClientes();
         }
     } else {
-        campoClientesRenovados.innerHTML =
-            '<span class="nenhum-cliente-renovado">Nenhum cliente renovado hoje</span>';
+        campoClientesRenovados.innerHTML = '<span class="nenhum-cliente-renovado">Nenhum cliente renovado hoje</span>';
     }
 }
 
 function exibirClientesAlterados() {
-    const clientesAlterados = JSON.parse(localStorage.getItem('clientesAlterados')) || [];
     const hoje = new Date().toLocaleDateString('pt-BR');
-    const clientesHoje = clientesAlterados.find(c => c.data === hoje);
     const campoClientesAlterados = document.getElementById('infoClientesAlterados');
+    
+    if (!campoClientesAlterados) return;
 
-    if (clientesHoje && clientesHoje.nomes.length > 0) {
-        const nomesUnicos = [...new Set(clientesHoje.nomes.map(cliente => cliente.nome))];
+    const clientesAlteradosRaw = JSON.parse(localStorage.getItem('clientesAlterados')) || [];
+    // Filtra apenas as alterações de hoje
+    const registroHoje = clientesAlteradosRaw.find(c => c.data === hoje);
+
+    if (registroHoje && registroHoje.nomes.length > 0) {
+        // Garantir que nomes sejam únicos
+        const nomesUnicos = [...new Set(registroHoje.nomes.map(item => item.nome))];
+        
         const listaClientes = nomesUnicos.map(nome =>
             `<li class="cliente-scroll" data-nome="${nome.toLowerCase()}">${nome}</li>`
         ).join('');
+
         campoClientesAlterados.innerHTML = `
             <span class="titulo-clientes-renovados">Clientes alterados hoje:</span>
             <ul>${listaClientes}</ul>`;
-        adicionarEventoScrollClientes();
+
+        if (typeof adicionarEventoScrollClientes === "function") {
+            adicionarEventoScrollClientes();
+        }
     } else {
         campoClientesAlterados.innerHTML = '<span class="nenhum-cliente-renovado">Nenhum cliente alterado hoje</span>';
     }
@@ -941,15 +1083,24 @@ function atualizarInfoClientes() {
 }
 
 // 🔹 Função genérica para contar clientes com base em condição
+// 🔹 Função corrigida para contar clientes tratando a String de data
 function contarClientesPorCondicao(condicaoCallback) {
     const agora = new Date();
     const clientes = carregarClientes();
 
     return clientes.reduce((total, cliente) => {
-        let dataVencimento = new Date(cliente.data);
+        let dataVencimento;
 
-        // Se cliente tem hora definida, aplica
-        if (cliente.hora) {
+        // --- CONVERSÃO DA STRING (DD/MM/AAAA) PARA OBJETO DATE ---
+        if (typeof cliente.data === 'string' && cliente.data.includes('/')) {
+            const [dia, mes, ano] = cliente.data.split('/');
+            dataVencimento = new Date(ano, mes - 1, dia);
+        } else {
+            dataVencimento = new Date(cliente.data);
+        }
+
+        // Se cliente tem hora definida, aplica para precisão
+        if (cliente.hora && cliente.hora.includes(':')) {
             const [h, m] = cliente.hora.split(":");
             dataVencimento.setHours(parseInt(h), parseInt(m), 0, 0);
         } else {
@@ -1008,7 +1159,6 @@ function carregarDarkMode() {
     }
 
     aplicarDarkMode(isDarkMode);
-
 }
 
 function verificarBackupDiario() {
@@ -1146,106 +1296,96 @@ function carregarPagina() {
     exibirClientesRenovadosHoje();
 }
 
+// --- EXPORTAR CLIENTES ---
 function exportarClientes() {
     const clientes = carregarClientes();
     const lixeira = carregarLixeira();
-    const todosClientes = [...clientes, ...lixeira];
-    const jsonClientes = JSON.stringify(todosClientes, null, 2);
+    // Adicionamos o ID do dono no backup para saber de quem é esse arquivo
+    const idDono = localStorage.getItem("id_dono_app") || "nao_identificado";
+    
+    const dadosParaExportar = {
+        id_dono: idDono,
+        data_exportacao: new Date().toISOString(),
+        clientes: clientes,
+        lixeira: lixeira
+    };
 
+    const jsonClientes = JSON.stringify(dadosParaExportar, null, 2);
     const blob = new Blob([jsonClientes], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'clientes_exportados.json';
+    a.download = `backup_clientes_${idDono}.json`;
     a.click();
 
     URL.revokeObjectURL(url);
 }
 
+// --- IMPORTAR CLIENTES ---
 function importarClientes(event) {
     const file = event.target.files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = async function(e) {
             try {
-                const data = JSON.parse(e.target.result);
+                const res = JSON.parse(e.target.result);
                 let clientesImportados = [];
                 let lixeiraImportada = [];
 
-                if (Array.isArray(data)) {
-                    clientesImportados = data;
-                } else if (typeof data === 'object') {
-                    clientesImportados = data.clientes || [];
-                    lixeiraImportada = data.lixeira || [];
-                    if (!clientesImportados.length && !lixeiraImportada.length) {
-                        for (let key in data) {
-                            if (key.toLowerCase().includes('cliente')) {
-                                clientesImportados = data[key];
-                            } else if (key.toLowerCase().includes('lixeira')) {
-                                lixeiraImportada = data[key];
-                            }
-                        }
-                    }
+                // Lógica de detecção do formato do JSON
+                if (Array.isArray(res)) {
+                    clientesImportados = res;
+                } else {
+                    clientesImportados = res.clientes || [];
+                    lixeiraImportada = res.lixeira || [];
                 }
 
-                // 🔁 Normaliza nomes de todos os clientes para minúsculo
-                clientesImportados = clientesImportados.map(cliente => ({
-                    ...cliente,
-                    nome: cliente.nome.toLowerCase()
-                }));
-
-                lixeiraImportada = lixeiraImportada.map(cliente => ({
-                    ...cliente,
-                    nome: cliente.nome.toLowerCase()
-                }));
+                // 1. Antes de tudo, garante que temos um ID de dono definido no navegador
+                // Se não tiver, a função obterIdDono() vai perguntar agora
+                const idDonoAtual = obterIdDono();
 
                 const clientesAtuais = carregarClientes();
                 const lixeiraAtual = carregarLixeira();
-                const mapaClientes = new Map();
 
-                clientesAtuais.forEach(cliente => {
-                    mapaClientes.set(cliente.nome.toLowerCase(), cliente);
-                });
-
-                clientesImportados.forEach(clienteImportado => {
-                    const nomeClienteImportado = clienteImportado.nome;
-                    if (mapaClientes.has(nomeClienteImportado)) {
-                        const clienteExistente = mapaClientes.get(nomeClienteImportado);
-                        clienteExistente.telefone = clienteImportado.telefone;
-                        clienteExistente.data = clienteImportado.data;
+                // 2. Processar Clientes Ativos
+                clientesImportados.forEach(novo => {
+                    const index = clientesAtuais.findIndex(c => c.nome.toLowerCase() === novo.nome.toLowerCase());
+                    if (index !== -1) {
+                        clientesAtuais[index].telefone = novo.telefone;
+                        clientesAtuais[index].data = novo.data;
+                        clientesAtuais[index].hora = novo.hora || ""; // Garante a hora
                     } else {
-                        clientesAtuais.push(clienteImportado);
+                        clientesAtuais.push(novo);
                     }
                 });
 
-                const mapaLixeira = new Map();
-                lixeiraAtual.forEach(cliente => {
-                    mapaLixeira.set(cliente.nome.toLowerCase(), cliente);
-                });
-
-                lixeiraImportada.forEach(clienteImportado => {
-                    const nomeClienteImportado = clienteImportado.nome;
-                    if (mapaLixeira.has(nomeClienteImportado)) {
-                        const clienteExistente = mapaLixeira.get(nomeClienteImportado);
-                        clienteExistente.telefone = clienteImportado.telefone;
-                        clienteExistente.data = clienteImportado.data;
+                // 3. Processar Lixeira
+                lixeiraImportada.forEach(novo => {
+                    const index = lixeiraAtual.findIndex(c => c.nome.toLowerCase() === novo.nome.toLowerCase());
+                    if (index !== -1) {
+                        lixeiraAtual[index].telefone = novo.telefone;
+                        lixeiraAtual[index].data = novo.data;
                     } else {
-                        lixeiraAtual.push(clienteImportado);
+                        lixeiraAtual.push(novo);
                     }
                 });
 
+                // 4. Salvar localmente
                 salvarClientes(clientesAtuais);
                 salvarLixeira(lixeiraAtual);
 
-                // 🔄 Atualiza todos no Firebase com nomes já normalizados
-                const promessasFirebase = clientesAtuais.map(cliente =>
-                    atualizarDataNoFirebase(cliente)
-                );
-                await Promise.all(promessasFirebase);
+                // 5. Enviar para o Firebase (Na pasta do ID do dono atual)
+                alert("Importando para o Firebase... Aguarde.");
+                
+                // Usamos um loop simples para garantir que cada um seja enviado
+                for (const cliente of clientesAtuais) {
+                    await atualizarDataNoFirebase(cliente);
+                }
 
-                alert("Importação realizada com sucesso!");
+                alert("Importação e Sincronização realizadas com sucesso!");
                 window.location.reload();
             } catch (error) {
+                console.error(error);
                 alert("Erro ao importar o arquivo: " + error.message);
             }
         };
@@ -1265,126 +1405,148 @@ document.getElementById('select-all').addEventListener('change', function() {
 
 // --- FUNÇÃO DE SINCRONIZAÇÃO COMPLETA ---
 async function sincronizarDoFirebase() {
-    if (!confirm("Isso irá baixar todos os clientes do banco de dados e atualizar seu dispositivo. Deseja continuar?")) {
-        return;
-    }
-
+    // 1. Pergunta o telefone para saber de qual pasta puxar
+    const telefoneRecuperacao = prompt("Digite seu número de telefone (o mesmo usado anteriormente) para recuperar seus clientes:");
+    
+    if (!telefoneRecuperacao) return;
+    
+    const idDono = telefoneRecuperacao.replace(/\D/g, '');
     const btn = document.getElementById('syncFirebase');
-    const originalText = btn.innerText;
-    btn.innerText = "Sincronizando...";
-    btn.disabled = true;
-
+    
     try {
-        const snapshot = await firebase.database().ref('clientes').once('value');
+        btn.innerText = "Buscando dados...";
+        
+        // Busca especificamente na pasta do telefone digitado
+        const snapshot = await firebase.database().ref('usuarios/' + idDono + '/clientes').once('value');
         const dadosFirebase = snapshot.val();
 
         if (!dadosFirebase) {
-            alert("Nenhum dado encontrado no Firebase.");
-            btn.innerText = originalText;
-            btn.disabled = false;
+            alert("Nenhum backup encontrado para este número de telefone.");
+            btn.innerText = "Restaurar todos os clientes";
             return;
         }
 
         const novosClientes = [];
-
         Object.keys(dadosFirebase).forEach(id => {
             const clienteFb = dadosFirebase[id];
-            
-            // Tratamento da data: Converte "DD/MM/AAAA" para Objeto Date
-            let dataObjeto;
-            if (clienteFb.vencimento && typeof clienteFb.vencimento === 'string') {
-                const partesData = clienteFb.vencimento.split('/');
-                dataObjeto = new Date(partesData[2], partesData[1] - 1, partesData[0]);
-            } else {
-                dataObjeto = new Date();
-            }
+            const partesData = clienteFb.vencimento.split('/');
+            const dataObjeto = new Date(partesData[2], partesData[1] - 1, partesData[0]);
 
             novosClientes.push({
                 nome: id, 
                 telefone: clienteFb.telefone || "",
                 data: dataObjeto,
-                hora: clienteFb.hora || ""
+                hora: clienteFb.hora || "" 
             });
         });
 
+        // Salva o telefone no localStorage para que os próximos salvamentos continuem aqui
+        localStorage.setItem("id_dono_app", idDono);
+        
         salvarClientes(novosClientes);
-        alert(`Sucesso! ${novosClientes.length} clientes foram recuperados.`);
+        alert(`Sucesso! ${novosClientes.length} clientes recuperados para o telefone ${idDono}.`);
         window.location.reload();
 
     } catch (error) {
-        console.error("Erro ao sincronizar:", error);
-        alert("Erro ao puxar dados do Firebase.");
-    } finally {
-        if (btn) {
-            btn.innerText = originalText;
-            btn.disabled = false;
-        }
+        console.error("Erro:", error);
+        alert("Erro ao conectar com o banco de dados.");
     }
 }
 
-function excluirClientesSelecionados() {
+async function excluirClientesSelecionados() {
     const checkboxes = document.querySelectorAll('.cliente-checkbox:checked');
     const clientes = carregarClientes();
     const lixeira = carregarLixeira();
-    let clientesExcluidos = false;
+    let promessasFirebase = []; // Para armazenar as exclusões do Firebase
+    let clientesExcluidosContagem = 0;
 
     checkboxes.forEach(checkbox => {
-        const nome = checkbox.closest('tr').getAttribute('data-nome');
+        const linha = checkbox.closest('tr');
+        if (!linha) return;
+
+        const nome = linha.getAttribute('data-nome');
         const clienteIndex = clientes.findIndex(c => c.nome.toLowerCase() === nome.toLowerCase());
 
         if (clienteIndex !== -1) {
-    const cliente = clientes.splice(clienteIndex, 1)[0];
+            // 1. Remove do array principal e guarda o objeto
+            const cliente = clientes.splice(clienteIndex, 1)[0];
+            
+            // 2. Adiciona à lixeira local
             lixeira.push(cliente);
-            clientesExcluidos = true;
+            
+            // 3. Prepara a exclusão no Firebase
+            // Certifique-se de que o nome da função seja removerClienteDoFirebase ou excluirClienteDoFirebase
+            if (typeof removerClienteDoFirebase === "function") {
+                promessasFirebase.push(removerClienteDoFirebase(nome));
+            }
+            
+            clientesExcluidosContagem++;
+            
+            // 4. (Opcional) Remove da lista de renovados hoje se estiver lá
+            if (typeof removerDeRenovadosHoje === "function") {
+                removerDeRenovadosHoje(nome);
+            }
         }
     });
 
-    if (clientesExcluidos) {
-        const somExclusao = new Audio('sounds/exclusao.mp3');
-        somExclusao.play();
-    }
-    salvarClientes(clientes);
-    salvarLixeira(lixeira);
-    carregarLixeiraPagina();
-    atualizarTabelaClientes();
-    atualizarInfoClientes();
-    carregarPagina();
+    if (clientesExcluidosContagem > 0) {
+        // Tocar som de exclusão
+        try {
+            const somExclusao = new Audio('sounds/exclusao.mp3');
+            somExclusao.play();
+        } catch (e) { console.log("Som não disponível"); }
 
-    if (clientesExcluidos) {
-        const feedbackElement = document.getElementById('feedback');
-        feedbackElement.innerText = "Clientes excluídos com sucesso";
-        feedbackElement.style.display = "block";
-        setTimeout(() => {
-            feedbackElement.style.display = "none";
-        }, 4000);
+        // Salva as alterações locais
+        salvarClientes(clientes);
+        salvarLixeira(lixeira);
+
+        try {
+            // Espera o Firebase confirmar a exclusão de todos os selecionados
+            await Promise.all(promessasFirebase);
+            
+            // Atualiza a interface
+            carregarLixeiraPagina();
+            atualizarTabelaClientes();
+            atualizarInfoClientes();
+            
+            const feedbackElement = document.getElementById('feedback');
+            if (feedbackElement) {
+                feedbackElement.innerText = `${clientesExcluidosContagem} cliente(s) movido(s) para a lixeira e removido(s) da nuvem.`;
+                feedbackElement.style.display = "block";
+                setTimeout(() => { feedbackElement.style.display = "none"; }, 4000);
+            }
+
+            // Recarrega para limpar a seleção e atualizar tudo
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+
+        } catch (error) {
+            console.error("Erro ao excluir do Firebase:", error);
+            alert("Erro ao excluir alguns clientes da nuvem, mas foram movidos para a lixeira local.");
+            window.location.reload();
+        }
+    } else {
+        alert("Nenhum cliente selecionado para excluir.");
     }
 }
-
-window.onload = function() {
-setInterval(carregarPagina, 30 * 1000);
-
-    carregarPagina();
-    carregarDarkMode();
-    verificarBackupDiario();
-    exibirClientesAlterados();
-    exibirClientesRenovadosHoje();
-    window.onscroll();
-};
 
 function atualizarDataNoFirebase(cliente) {
-    const id = gerarIdFirebase(cliente.nome);
+    const idDono = obterIdDono(); 
+    const idCliente = gerarIdFirebase(cliente.nome);
+    const caminho = 'usuarios/' + idDono + '/clientes/' + idCliente;
 
-    return firebase.database().ref('clientes/' + id).set({
-        vencimento: new Date(cliente.data).toLocaleDateString('pt-BR'),
+    return firebase.database().ref(caminho).set({
+        nome: cliente.nome,
         telefone: cliente.telefone,
-        hora: cliente.hora || "" // <-- Adicionado para salvar a hora no Firebase
+        vencimento: cliente.data, // Aqui agora chegará a string "30/03/2026"
+        hora: cliente.hora || ""   
     }).then(() => {
-        console.log("✅ Cliente atualizado no Firebase:", id);
+        console.log("✅ Sincronizado com sucesso!");
     }).catch((error) => {
-        console.error("❌ Erro ao atualizar cliente no Firebase:", error);
+        console.error("❌ Erro ao salvar:", error);
     });
 }
-
 
 function abrirModalCadastro() {
     document.getElementById("modalCadastro").style.display = "block";
@@ -1478,7 +1640,7 @@ function salvarEdicaoCliente() {
     const nomeAntigo = document.getElementById("editNomeAntigo").value;
     const novoNome = document.getElementById("editNome").value.trim().toLowerCase();
     const novoTelefone = document.getElementById("editTelefone").value.trim();
-    const novaDataRaw = document.getElementById("editData").value;
+    const novaDataRaw = document.getElementById("editData").value; // Formato AAAA-MM-DD
     const novaHora = document.getElementById("editHora").value;
 
     if (!novoNome || !novoTelefone || !novaDataRaw) {
@@ -1491,60 +1653,87 @@ function salvarEdicaoCliente() {
 
     if (clienteIndex !== -1) {
         const clienteAnterior = clientes[clienteIndex];
-        let mensagensFeedback = []; // Lista para acumular as mensagens de sucesso
+        let mensagensFeedback = [];
 
-        // 1. Comparação de Data (Renovação)
-        const dataAntigaStr = new Date(clienteAnterior.data).toLocaleDateString('pt-BR');
+        // 1. Tratamento da Data (Converte AAAA-MM-DD do input para DD/MM/AAAA)
         const partesData = novaDataRaw.split('-');
-        const novaDataVencimento = new Date(partesData[0], partesData[1] - 1, partesData[2]);
-        const novaDataStr = novaDataVencimento.toLocaleDateString('pt-BR');
+        const novaDataFormatadaStr = `${partesData[2]}/${partesData[1]}/${partesData[0]}`;
 
-        if (dataAntigaStr !== novaDataStr) {
+        // Lógica de Renovação: Se a data mudou, registramos na lista de renovados
+        if (clienteAnterior.data !== novaDataFormatadaStr) {
             mensagensFeedback.push("Cliente renovado com sucesso ✅");
-            if (typeof renovarCliente === "function") {
-                renovarCliente(novoNome);
+            
+            // Registra na lista de "Clientes renovados hoje"
+            if (typeof registrarClienteRenovadoHoje === "function") {
+                registrarClienteRenovadoHoje(novoNome);
             }
         }
 
-        // 2. Comparação de Nome
+        // 2. Mudança de Nome (Importante para o Firebase)
         if (nomeAntigo.toLowerCase() !== novoNome) {
-            mensagensFeedback.push("Nome do cliente alterado com sucesso ✅");
-            // Se o nome mudou, removemos o registro antigo do Firebase pois o ID mudará
-            if (typeof excluirClienteDoFirebase === "function") {
-                excluirClienteDoFirebase(nomeAntigo);
+            mensagensFeedback.push("Nome alterado com sucesso ✅");
+            
+            // Se o nome mudou, removemos o registro antigo no Firebase
+            if (typeof removerClienteDoFirebase === "function") {
+                removerClienteDoFirebase(nomeAntigo);
+            }
+            
+            // Opcional: Registrar como alteração de cadastro
+            if (typeof registrarClienteAlterado === "function") {
+                registrarClienteAlterado(novoNome);
             }
         }
 
-        // 3. Comparação de Telefone
+        // 3. Mudança de Telefone
         if (clienteAnterior.telefone !== novoTelefone) {
-            mensagensFeedback.push("Telefone do cliente alterado com sucesso ✅");
+            if (nomeAntigo.toLowerCase() === novoNome) { // Só add se o nome não mudou (evitar duplicar alertas)
+                mensagensFeedback.push("Telefone alterado com sucesso ✅");
+            }
         }
 
+        // Criamos o objeto atualizado no padrão que o Firebase aceita (Data como String)
         const clienteAtualizado = {
             nome: novoNome,
             telefone: novoTelefone,
-            data: novaDataVencimento,
+            data: novaDataFormatadaStr, // Salva "DD/MM/AAAA"
             hora: novaHora || ""
         };
 
-        // Salva localmente
+        // Salva localmente no array e no LocalStorage
         clientes[clienteIndex] = clienteAtualizado;
         salvarClientes(clientes);
 
-        // Atualizar Firebase
+        // 4. Sincroniza com o Firebase
         atualizarDataNoFirebase(clienteAtualizado)
             .then(() => {
-                // Se houver mensagens específicas, exibe-as. Caso contrário, exibe a geral.
                 if (mensagensFeedback.length > 0) {
                     alert(mensagensFeedback.join('\n'));
                 } else {
                     alert("Alterações salvas com sucesso!");
                 }
-                window.location.reload();
+                window.location.reload(); // Recarrega para atualizar tabela e listas
             })
             .catch(err => {
-                console.error("Erro no Firebase:", err);
+                console.error("Erro ao sincronizar com Firebase:", err);
                 window.location.reload(); 
             });
     }
+}
+
+function obterIdDono() {
+    let idDono = localStorage.getItem("id_dono_app");
+    
+    if (!idDono) {
+        idDono = prompt("Para manter seus dados seguros e permitir a restauração, digite seu número de telefone (apenas números):");
+        if (idDono) {
+            // Limpa qualquer caractere que não seja número
+            idDono = idDono.replace(/\D/g, '');
+            localStorage.setItem("id_dono_app", idDono);
+        } else {
+            // Se ele cancelar, usamos um id padrão ou pedimos novamente
+            alert("É necessário um identificador para salvar os dados no Firebase.");
+            return "padrao";
+        }
+    }
+    return idDono;
 }
