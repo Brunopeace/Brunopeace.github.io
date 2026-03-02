@@ -154,6 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
     exibirClientesRenovadosHoje();
     carregarDarkMode();
     verificarBackupDiario();
+    verificarIdentificador();
     
     // Inicializa a página e define o intervalo de atualização automática
     if (typeof carregarPagina === "function") {
@@ -637,6 +638,121 @@ function gerarIdFirebase(nome) {
         .replace(/[.#$/[\]]/g, ''); // remove caracteres inválidos para o Firebase
 }
 
+function atualizarCorCelulaData(celulaData, data, hora) {
+    let dataVencimento;
+
+    // 1. Tratamento da data (String BR ou ISO/Objeto)
+    if (typeof data === 'string' && data.includes('/')) {
+        const [dia, mes, ano] = data.split('/');
+        dataVencimento = new Date(ano, mes - 1, dia);
+    } else {
+        dataVencimento = new Date(data);
+    }
+
+    // 2. Ajuste de hora para precisão no cálculo de "Vencido"
+    if (hora && hora.includes(':')) {
+        const [h, m] = hora.split(":");
+        dataVencimento.setHours(parseInt(h), parseInt(m), 0, 0);
+    } else {
+        // Sem hora definida, consideramos o final do dia
+        dataVencimento.setHours(23, 59, 59, 999);
+    }
+
+    const agora = new Date();
+    const hojeZerado = new Date();
+    hojeZerado.setHours(0, 0, 0, 0);
+
+    const dataVencZerada = new Date(dataVencimento);
+    dataVencZerada.setHours(0, 0, 0, 0);
+
+    // Diferença em dias inteiros
+    const diffMs = dataVencZerada - hojeZerado;
+    const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+    // Limpa cores anteriores
+    celulaData.classList.remove('red', 'yellow', 'orange');
+
+    // --- REGRAS DE CORES POR PRIORIDADE ---
+    
+    // VERMELHO: Se a data/hora exata já passou
+    if (agora > dataVencimento) {
+        celulaData.classList.add('red'); 
+    } 
+    // AMARELO: Se o vencimento é hoje (independente da hora)
+    else if (diffDias === 0) {
+        celulaData.classList.add('yellow');
+    } 
+    // LARANJA: Somente se faltarem EXATAMENTE 2 dias
+    else if (diffDias === 2) {
+        celulaData.classList.add('orange');
+    }
+    
+}
+
+function atualizarTabelaOrdenada() {
+    const tabela = document.getElementById('corpoTabela');
+    if (!tabela) return;
+
+    // 1. Puxa os clientes salvos no navegador
+    let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+    const agora = new Date();
+    const hojeZerado = new Date();
+    hojeZerado.setHours(0, 0, 0, 0);
+
+    const obterPrioridade = (cliente) => {
+        let dv;
+        // Tratamento de formato de data (BR ou ISO)
+        if (typeof cliente.data === 'string' && cliente.data.includes('/')) {
+            const [d, m, a] = cliente.data.split('/');
+            dv = new Date(a, m - 1, d);
+        } else {
+            dv = new Date(cliente.data);
+        }
+        
+        // Ajuste de hora para o cálculo de "já venceu"
+        if (cliente.hora && cliente.hora.includes(':')) {
+            const [h, min] = cliente.hora.split(':');
+            dv.setHours(parseInt(h), parseInt(min), 0, 0);
+        } else {
+            dv.setHours(23, 59, 59, 999);
+        }
+
+        const dvZerada = new Date(dv);
+        dvZerada.setHours(0, 0, 0, 0);
+        
+        // Diferença exata em dias
+        const diffDias = Math.round((dvZerada - hojeZerado) / (1000 * 60 * 60 * 24));
+
+        // --- DEFINIÇÃO DE PESOS PARA ORDENAÇÃO ---
+        // Quanto menor o número, mais alto na tabela o cliente fica.
+
+        if (agora > dv) return 5;               // VENCIDO: Vai para o fim (Peso maior)
+        if (diffDias === 2) return 1;           // LARANJA: Topo absoluto (Exatos 2 dias)
+        if (diffDias === 1) return 2;           // AMANHÃ: Logo abaixo do topo
+        if (diffDias === 0) return 3;           // HOJE: Abaixo de quem vence amanhã
+        return 4;                               // OUTROS: Vencimentos distantes
+    };
+
+    // 2. Ordenação Real do Array
+    clientes.sort((a, b) => {
+        const pA = obterPrioridade(a);
+        const pB = obterPrioridade(b);
+
+        // Se as prioridades forem diferentes, ordena pelo peso
+        if (pA !== pB) return pA - pB;
+        
+        // Se estiverem no mesmo grupo de prioridade, ordena por Nome (A-Z)
+        return a.nome.localeCompare(b.nome);
+    });
+
+    // 3. Limpa a tabela visual e reconstrói na nova ordem
+    tabela.innerHTML = "";
+    clientes.forEach(c => {
+        // Certifique-se que a função adicionarLinhaTabela existe no seu código
+        adicionarLinhaTabela(c.nome, c.telefone, c.data, c.hora);
+    });
+}
+
 function adicionarLinhaTabela(nome, telefone, data, hora = "") {
     const tabela = document.getElementById('corpoTabela');
     const novaLinha = document.createElement('tr');
@@ -799,55 +915,6 @@ function criarBotao(texto, acao) {
     botao.innerText = texto;
     botao.addEventListener('click', acao);
     return botao;
-}
-
-function atualizarCorCelulaData(celulaData, data, hora) {
-    let dataVencimento;
-
-    // --- CORREÇÃO PARA DATA EM FORMATO STRING (DD/MM/AAAA) ---
-    if (typeof data === 'string' && data.includes('/')) {
-        const [dia, mes, ano] = data.split('/');
-        // O mês no JavaScript começa em 0 (Janeiro = 0, Março = 2)
-        dataVencimento = new Date(ano, mes - 1, dia);
-    } else {
-        // Se for um objeto Date ou formato ISO, usa o padrão
-        dataVencimento = new Date(data);
-    }
-
-    // Se tiver hora cadastrada, ajusta a hora para precisão no cálculo
-    if (hora && hora.includes(':')) {
-        const [h, m] = hora.split(":");
-        dataVencimento.setHours(parseInt(h), parseInt(m), 0, 0);
-    } else {
-        // Caso não tenha hora, considera o final do dia para não vencer antes do tempo
-        dataVencimento.setHours(23, 59, 59, 999);
-    }
-
-    const agora = new Date();
-
-    // Remove classes de cores antigas antes de aplicar a nova
-    celulaData.classList.remove('red', 'yellow', 'orange');
-
-    // 1. Verifica se já passou do tempo (Vencido)
-    if (agora > dataVencimento) {
-        celulaData.classList.add('red'); 
-    } else {
-        // 2. Cálculo de quantos dias faltam (ignorando as horas para o cálculo de dias inteiros)
-        const dataVencimentoZerada = new Date(dataVencimento);
-        dataVencimentoZerada.setHours(0, 0, 0, 0);
-
-        const hojeZerado = new Date();
-        hojeZerado.setHours(0, 0, 0, 0);
-
-        const diffMs = dataVencimentoZerada - hojeZerado;
-        const diferencaDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
-
-        if (diferencaDias === 0) {
-            celulaData.classList.add('yellow'); // Vence hoje
-        } else if (diferencaDias <= 2 && diferencaDias > 0) {
-            celulaData.classList.add('orange'); // Faltam 1 ou 2 dias
-        }
-    }
 }
 
 function renovarCliente(nome) {
@@ -1404,51 +1471,92 @@ document.getElementById('select-all').addEventListener('change', function() {
 
 // --- FUNÇÃO DE SINCRONIZAÇÃO COMPLETA ---
 async function sincronizarDoFirebase() {
-    // 1. Pergunta o telefone para saber de qual pasta puxar
-    const telefoneRecuperacao = prompt("Digite seu número de telefone (o mesmo usado anteriormente) para recuperar seus clientes:");
-    
-    if (!telefoneRecuperacao) return;
-    
-    const idDono = telefoneRecuperacao.replace(/\D/g, '');
     const btn = document.getElementById('syncFirebase');
-    
+    let idDono = localStorage.getItem("id_dono_app");
+
+    // Se não tem ID salvo, abre o modal para o usuário digitar
+    if (!idDono || idDono === "padrao") {
+        const modal = document.getElementById("modalIdDono");
+        if (modal) {
+            modal.style.display = "flex";
+            // Focamos no input para facilitar a digitação
+            document.getElementById("inputTelefoneDono").focus();
+        } else {
+            alert("Erro: Modal de identificação não encontrado no HTML.");
+        }
+        return; 
+    }
+
+    // Se já tem o ID, prossegue com a busca automática
+    realizarBuscaNoFirebase(idDono);
+}
+
+async function realizarBuscaNoFirebase(idDono) {
+    const btn = document.getElementById('syncFirebase');
+    const textoOriginal = btn.innerText;
+
     try {
+        btn.disabled = true;
         btn.innerText = "Buscando dados...";
         
-        // Busca especificamente na pasta do telefone digitado
         const snapshot = await firebase.database().ref('usuarios/' + idDono + '/clientes').once('value');
         const dadosFirebase = snapshot.val();
 
         if (!dadosFirebase) {
-            alert("Nenhum backup encontrado para este número de telefone.");
-            btn.innerText = "Restaurar todos os clientes";
+            alert("Nenhum backup encontrado para este número.");
+            btn.innerText = textoOriginal;
+            btn.disabled = false;
             return;
         }
 
         const novosClientes = [];
-        Object.keys(dadosFirebase).forEach(id => {
-            const clienteFb = dadosFirebase[id];
-            const partesData = clienteFb.vencimento.split('/');
-            const dataObjeto = new Date(partesData[2], partesData[1] - 1, partesData[0]);
+        
+        Object.keys(dadosFirebase).forEach(nomeChave => {
+            const clienteFb = dadosFirebase[nomeChave];
+            let dataFinal;
+            
+            // LÓGICA DE TRATAMENTO DE DATA (Suporta ISO e Brasileiro)
+            const dataRaw = clienteFb.vencimento || clienteFb.data;
+
+            if (dataRaw && typeof dataRaw === 'string') {
+                if (dataRaw.includes('T')) {
+                    // Se for formato ISO (2026-05-01T03:00:00.000Z)
+                    dataFinal = new Date(dataRaw);
+                } else if (dataRaw.includes('/')) {
+                    // Se for formato Brasileiro (02/04/2026)
+                    const partes = dataRaw.split('/');
+                    dataFinal = new Date(partes[2], partes[1] - 1, partes[0]);
+                } else {
+                    dataFinal = new Date(dataRaw);
+                }
+            } else {
+                dataFinal = new Date(); // Fallback
+            }
+
+            // Se a data resultou em "Invalid Date", coloca a data de hoje para não quebrar
+            if (isNaN(dataFinal.getTime())) {
+                dataFinal = new Date();
+            }
 
             novosClientes.push({
-                nome: id, 
+                nome: nomeChave, 
                 telefone: clienteFb.telefone || "",
-                data: dataObjeto,
+                data: dataFinal.toISOString(), // Salvamos como string para padronizar
                 hora: clienteFb.hora || "" 
             });
         });
 
-        // Salva o telefone no localStorage para que os próximos salvamentos continuem aqui
         localStorage.setItem("id_dono_app", idDono);
-        
         salvarClientes(novosClientes);
-        alert(`Sucesso! ${novosClientes.length} clientes recuperados para o telefone ${idDono}.`);
+        
+        alert(`Sucesso! ${novosClientes.length} clientes restaurados.`);
         window.location.reload();
 
     } catch (error) {
-        console.error("Erro:", error);
+        console.error("Erro na sincronização:", error);
         alert("Erro ao conectar com o banco de dados.");
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
     }
 }
 
@@ -1635,7 +1743,6 @@ function salvarTokenNoRealtime(token) {
     });
 }
 
-
 function verificarVencimentosENotificar() {
     const clientes = carregarClientes(); // Sua função que busca do LocalStorage
     const hoje = new Date();
@@ -1781,20 +1888,35 @@ function salvarEdicaoCliente() {
     }
 }
 
+// 1. Função que apenas retorna o ID se ele já existir
 function obterIdDono() {
-    let idDono = localStorage.getItem("id_dono_app");
+    return localStorage.getItem("id_dono_app") || "padrao";
+}
+
+// 2. Função que verifica se precisa abrir o modal ao carregar o app
+function verificarIdentificador() {
+    const idExistente = localStorage.getItem("id_dono_app");
     
-    if (!idDono) {
-        idDono = prompt("Para manter seus dados seguros e permitir a restauração, digite seu número de telefone (apenas números):");
-        if (idDono) {
-            // Limpa qualquer caractere que não seja número
-            idDono = idDono.replace(/\D/g, '');
-            localStorage.setItem("id_dono_app", idDono);
-        } else {
-            // Se ele cancelar, usamos um id padrão ou pedimos novamente
-            alert("É necessário um identificador para salvar os dados no Firebase.");
-            return "padrao";
-        }
+    if (!idExistente) {
+        document.getElementById("modalIdDono").style.display = "flex";
     }
-    return idDono;
+}
+
+// 3. Função chamada pelo botão do Modal
+function confirmarIdDono() {
+    const input = document.getElementById("inputTelefoneDono");
+    let telefone = input.value.replace(/\D/g, ''); // Limpa caracteres especiais
+
+    if (telefone.length >= 8) {
+        // Salva o ID
+        localStorage.setItem("id_dono_app", telefone);
+        
+        // Esconde o modal
+        document.getElementById("modalIdDono").style.display = "none";
+        
+        // Chama a função de busca que definimos acima
+        realizarBuscaNoFirebase(telefone);
+    } else {
+        alert("Por favor, digite um número de telefone válido com DDD.");
+    }
 }
