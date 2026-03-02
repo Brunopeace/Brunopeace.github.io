@@ -54,6 +54,17 @@
 <label for="importarClientes" class="button">Importar Backup <img src="img/diskette.png" class="diskette"></label><br>
 </div>
 
+<div id="modalIdDono" class="modal-containner">
+    <div class="modal-content">
+        <h3>Bem-vindo! 📱</h3>
+        <p>Para sincronizar seus dados e permitir o acesso em outros aparelhos, informe seu número de telefone:</p>
+        <input type="tel" id="inputTelefoneDono" placeholder="(00) 00000-0000" maxlength="15">
+        <div class="modal-actions">
+            <button onclick="confirmarIdDono()" class="btn-confirmar">Salvar e Sincronizar</button>
+        </div>
+    </div>
+</div>
+
 <div id="modalCadastro" class="modal">
   <div class="modal-conteudo">
     <span class="fechar" onclick="fecharModalCadastro()">&times;</span>
