@@ -1384,3 +1384,60 @@ body.dark-mode #modalEditar .modal-conteudo input {
     background: radial-gradient(circle, rgb(97, 247, 208), rgb(52, 2, 157));
     font-weight: bold;
 }
+
+.modal-containner {
+    display: none; /* Escondido por padrão */
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content h3 { margin-bottom: 15px; color: #333; }
+.modal-content p { font-size: 14px; color: #666; margin-bottom: 20px; }
+
+#inputTelefoneDono {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    font-size: 16px;
+    margin-bottom: 20px;
+    outline: none;
+}
+
+#inputTelefoneDono:focus { border-color: #25D366; }
+
+.btn-confirmar {
+    background: #25D366;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.3s;
+}
+
+.btn-confirmar:hover { background: #128C7E; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
