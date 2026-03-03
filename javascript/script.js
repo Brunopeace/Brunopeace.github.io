@@ -65,7 +65,7 @@ setTimeout(() => {
 
 
     function _0xcheck() {
-        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973'];
+        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973', 'b0472a42-4e0c-42e5-9169-2b51036e2f44'];
         let _0xS = localStorage['getItem']('uuid');
 
         if (!_0xS) {
@@ -1043,9 +1043,7 @@ function exibirClientesAlterados() {
 
         campo.innerHTML = `<span class="titulo-clientes-alterados">Outras alterações hoje:</span><ul>${lista}</ul>`;
         if (typeof adicionarEventoScrollClientes === "function") adicionarEventoScrollClientes();
-    } else {
-        campo.innerHTML = '<span class="nenhum-cliente-renovado">Nenhuma alteração de cadastro hoje</span>';
-    }
+    } 
 }
 
 function adicionarEventoScrollClientes() {
@@ -1107,25 +1105,21 @@ function pesquisarCliente() {
 function atualizarInfoClientes() {
     const totalVencidos = calcularTotalClientesVencidos();
     const totalNaoVencidos = calcularTotalClientesNaoVencidos();
-    const infoDiv = document.getElementById('infoClientes2');
+    
+    const infoDiv = document.getElementById('painelContagem');
+    if (!infoDiv) return;
 
-    // Limpa conteúdo anterior
-    infoDiv.innerHTML = '';
-
-    // Cria elementos
-    const vencidosSpan = document.createElement('span');
-    vencidosSpan.className = 'clientes-vencidos';
-    vencidosSpan.textContent = `Clientes vencidos: ${totalVencidos}`;
-
-    const ativosSpan = document.createElement('span');
-    ativosSpan.className = 'clientes-ativos';
-    ativosSpan.textContent = `Clientes ativos: ${totalNaoVencidos}`;
-
-    // Adiciona ao container
-    infoDiv.appendChild(vencidosSpan);
-    infoDiv.appendChild(document.createElement('br'));
-    infoDiv.appendChild(ativosSpan);
+    // Monta os dois cards exatamente como na foto
+    infoDiv.innerHTML = `
+        <div class="card-contagem card-vencidos">
+            Clientes vencidos: ${totalVencidos}
+        </div>
+        <div class="card-contagem card-ativos">
+            Clientes ativos: ${totalNaoVencidos}
+        </div>
+    `;
 }
+
 
 // 🔹 Função genérica para contar clientes com base em condição
 // 🔹 Função corrigida para contar clientes tratando a String de data
