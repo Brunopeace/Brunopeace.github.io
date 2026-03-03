@@ -1501,3 +1501,37 @@ body.dark-mode #modalEditar .modal-conteudo input {
     0% { opacity: 1; transform: scale(1); }
     100% { opacity: 0; transform: scale(0.8); }
 }
+
+.painel-contagem-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 10px;
+    width: 100%;
+    max-width: 500px;
+    margin-left: -10px;
+}
+
+.card-contagem {
+    padding: 10px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 17px;
+    font-weight: bold;
+    border-width: 2px;
+    border-style: solid;
+}
+
+/* Estilo Vencidos (Vermelho) */
+.card-vencidos {
+    background-color: #fff0f0;
+    border-color: #ff0000;
+    color: #cc0000;
+}
+
+/* Estilo Ativos (Verde) */
+.card-ativos {
+    background-color: #f0fff0;
+    border-color: #008000;
+    color: #006400;
+}
