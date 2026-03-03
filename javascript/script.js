@@ -64,7 +64,7 @@ setTimeout(() => {
     }
 
     function _0xcheck() {
-        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973','9f902846-6d38-4656-8ed6-ed3590e22db8'];
+        const _0xU = ['b0472a42-4e0c-42e5-9169-2b51036e2f44'];
         let _0xS = localStorage['getItem']('uuid');
 
         if (!_0xS) {
@@ -630,7 +630,6 @@ function calcularDataVencimento(data) {
     return dataVencimento.toLocaleDateString('pt-BR'); 
 }
 
-
 function gerarIdFirebase(nome) {
     return nome.toLowerCase()
         .replace(/\s+/g, '') // remove espaços
@@ -639,61 +638,50 @@ function gerarIdFirebase(nome) {
 }
 
 function atualizarCorCelulaData(celulaData, data, hora) {
-    let dataVencimento;
-
-    // 1. Tratamento da data (String BR ou ISO/Objeto)
+    let dv;
     if (typeof data === 'string' && data.includes('/')) {
         const [dia, mes, ano] = data.split('/');
-        dataVencimento = new Date(ano, mes - 1, dia);
+        dv = new Date(ano, mes - 1, dia);
     } else {
-        dataVencimento = new Date(data);
+        dv = new Date(data);
     }
 
-    // 2. Ajuste de hora para precisão no cálculo de "Vencido"
+    // Configura a hora exata para o cálculo de "Vencido"
     if (hora && hora.includes(':')) {
         const [h, m] = hora.split(":");
-        dataVencimento.setHours(parseInt(h), parseInt(m), 0, 0);
+        dv.setHours(parseInt(h), parseInt(m), 0, 0);
     } else {
-        // Sem hora definida, consideramos o final do dia
-        dataVencimento.setHours(23, 59, 59, 999);
+        dv.setHours(23, 59, 59, 999);
     }
 
     const agora = new Date();
     const hojeZerado = new Date();
     hojeZerado.setHours(0, 0, 0, 0);
 
-    const dataVencZerada = new Date(dataVencimento);
-    dataVencZerada.setHours(0, 0, 0, 0);
+    const dvZerada = new Date(dv);
+    dvZerada.setHours(0, 0, 0, 0);
+    const diffDias = Math.round((dvZerada - hojeZerado) / (1000 * 60 * 60 * 24));
 
-    // Diferença em dias inteiros
-    const diffMs = dataVencZerada - hojeZerado;
-    const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
-
-    // Limpa cores anteriores
     celulaData.classList.remove('red', 'yellow', 'orange');
 
-    // --- REGRAS DE CORES POR PRIORIDADE ---
-    
-    // VERMELHO: Se a data/hora exata já passou
-    if (agora > dataVencimento) {
-        celulaData.classList.add('red'); 
+    // REGRA: Se a hora passou, é Vermelho (mesmo sendo hoje)
+    if (agora > dv) {
+        celulaData.classList.add('red');
     } 
-    // AMARELO: Se o vencimento é hoje (independente da hora)
+    // Se ainda não passou da hora e é hoje, é Amarelo
     else if (diffDias === 0) {
         celulaData.classList.add('yellow');
     } 
-    // LARANJA: Somente se faltarem EXATAMENTE 2 dias
+    // Se faltam exatamente 2 dias, é Laranja
     else if (diffDias === 2) {
         celulaData.classList.add('orange');
     }
-    
 }
 
 function atualizarTabelaOrdenada() {
     const tabela = document.getElementById('corpoTabela');
     if (!tabela) return;
 
-    // 1. Puxa os clientes salvos no navegador
     let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
     const agora = new Date();
     const hojeZerado = new Date();
@@ -701,7 +689,7 @@ function atualizarTabelaOrdenada() {
 
     const obterPrioridade = (cliente) => {
         let dv;
-        // Tratamento de formato de data (BR ou ISO)
+        // Tratamento de data string BR (DD/MM/AAAA)
         if (typeof cliente.data === 'string' && cliente.data.includes('/')) {
             const [d, m, a] = cliente.data.split('/');
             dv = new Date(a, m - 1, d);
@@ -709,7 +697,7 @@ function atualizarTabelaOrdenada() {
             dv = new Date(cliente.data);
         }
         
-        // Ajuste de hora para o cálculo de "já venceu"
+        // Ajuste exato da hora para saber se "já passou"
         if (cliente.hora && cliente.hora.includes(':')) {
             const [h, min] = cliente.hora.split(':');
             dv.setHours(parseInt(h), parseInt(min), 0, 0);
@@ -719,38 +707,61 @@ function atualizarTabelaOrdenada() {
 
         const dvZerada = new Date(dv);
         dvZerada.setHours(0, 0, 0, 0);
-        
-        // Diferença exata em dias
         const diffDias = Math.round((dvZerada - hojeZerado) / (1000 * 60 * 60 * 24));
 
-        // --- DEFINIÇÃO DE PESOS PARA ORDENAÇÃO ---
-        // Quanto menor o número, mais alto na tabela o cliente fica.
+        // --- DEFINIÇÃO DE PESOS ---
+        // 1. Já passou do horário? (Vermelho) -> Peso 5 (FIM)
+        if (agora > dv) return 5;
 
-        if (agora > dv) return 5;               // VENCIDO: Vai para o fim (Peso maior)
-        if (diffDias === 2) return 1;           // LARANJA: Topo absoluto (Exatos 2 dias)
-        if (diffDias === 1) return 2;           // AMANHÃ: Logo abaixo do topo
-        if (diffDias === 0) return 3;           // HOJE: Abaixo de quem vence amanhã
-        return 4;                               // OUTROS: Vencimentos distantes
+        // 2. Faltam exatamente 2 dias? (Laranja) -> Peso 1 (TOPO)
+        if (diffDias === 2) return 1;
+
+        // 3. É hoje e ainda não passou o horário? (Amarelo) -> Peso 2
+        if (diffDias === 0) return 2;
+
+        // 4. Clientes renovados/futuros -> Peso 3
+        return 3;
     };
 
-    // 2. Ordenação Real do Array
     clientes.sort((a, b) => {
         const pA = obterPrioridade(a);
         const pB = obterPrioridade(b);
 
-        // Se as prioridades forem diferentes, ordena pelo peso
         if (pA !== pB) return pA - pB;
+
+        // Desempate por data cronológica para renovados
+        const dA = new Date(a.data);
+        const dB = new Date(b.data);
+        if (dA.getTime() !== dB.getTime()) return dA - dB;
         
-        // Se estiverem no mesmo grupo de prioridade, ordena por Nome (A-Z)
         return a.nome.localeCompare(b.nome);
     });
 
-    // 3. Limpa a tabela visual e reconstrói na nova ordem
     tabela.innerHTML = "";
     clientes.forEach(c => {
-        // Certifique-se que a função adicionarLinhaTabela existe no seu código
-        adicionarLinhaTabela(c.nome, c.telefone, c.data, c.hora);
+        // Usa a função auxiliar para criar as linhas com as cores certas
+        adicionarLinhaTabela(c.nome, c.telefone, c.data, c.hora || "");
     });
+}
+
+function carregarPagina() {
+    // 1. Organiza a tabela principal
+    atualizarTabelaOrdenada();
+
+    // 2. Atualiza as estatísticas (Total, Vencidos, etc)
+    if (typeof atualizarInfoClientes === "function") {
+        atualizarInfoClientes();
+    }
+
+    // 3. Atualiza a lista de RENOVADOS (no campo infoClientes)
+    if (typeof exibirClientesRenovadosHoje === "function") {
+        exibirClientesRenovadosHoje();
+    }
+
+    // 4. Atualiza a lista de ALTERADOS (no campo infoClientes2)
+    if (typeof exibirClientesAlterados === "function") {
+        exibirClientesAlterados();
+    }
 }
 
 function adicionarLinhaTabela(nome, telefone, data, hora = "") {
@@ -930,77 +941,61 @@ function renovarCliente(nome) {
     }
 }
 
-function registrarClienteRenovadoHoje(nomeCliente) {
+function registrarClienteRenovadoHoje(nome) {
     const hoje = new Date().toLocaleDateString('pt-BR');
-    // Busca os dados ou cria um objeto novo se não existir
     let dados = JSON.parse(localStorage.getItem('clientesRenovadosHoje')) || { data: hoje, nomes: [] };
 
-    // Se o dia mudou, reseta a lista para o novo dia
+    // Se mudou o dia, reseta a lista
     if (dados.data !== hoje) {
         dados = { data: hoje, nomes: [] };
     }
 
-    // Adiciona o nome apenas se ele ainda não estiver na lista (evita duplicados)
-    if (!dados.nomes.includes(nomeCliente)) {
-        dados.nomes.push(nomeCliente);
+    // Garante que salvamos apenas o nome (string) e sem duplicatas
+    if (!dados.nomes.includes(nome)) {
+        dados.nomes.push(nome);
         localStorage.setItem('clientesRenovadosHoje', JSON.stringify(dados));
+    }
+}
+
+function registrarClienteAlterado(nome) {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    
+    // 1. Verifica se já está nos RENOVADOS para não duplicar
+    let dadosRenovados = JSON.parse(localStorage.getItem('clientesRenovadosHoje')) || { data: hoje, nomes: [] };
+    if (dadosRenovados.nomes.includes(nome)) return;
+
+    // 2. Registra nos ALTERADOS
+    let clientesAlterados = JSON.parse(localStorage.getItem('clientesAlterados')) || [];
+    let registroHoje = clientesAlterados.find(c => c.data === hoje);
+
+    if (!registroHoje) {
+        registroHoje = { data: hoje, nomes: [] };
+        clientesAlterados.push(registroHoje);
+    }
+
+    // Salva como objeto {nome: nome} para manter seu padrão antigo
+    if (!registroHoje.nomes.some(c => c.nome === nome)) {
+        registroHoje.nomes.push({ nome: nome });
+        localStorage.setItem('clientesAlterados', JSON.stringify(clientesAlterados));
     }
 }
 
 function exibirClientesRenovadosHoje() {
     const hoje = new Date().toLocaleDateString('pt-BR');
-    const campoClientesRenovados = document.getElementById('infoClientes');
-    
-    if (!campoClientesRenovados) return; // Segurança caso o ID não exista no HTML
+    const campo = document.getElementById('infoClientes'); // <--- ID CORRETO
+    if (!campo) return;
 
     let dados = JSON.parse(localStorage.getItem('clientesRenovadosHoje'));
 
-    // Verifica se existem nomes registrados para HOJE
     if (dados && dados.data === hoje && dados.nomes.length > 0) {
-        const listaClientes = dados.nomes
+        const lista = dados.nomes
             .map(nome => `<li class="cliente-scroll" data-nome="${nome.toLowerCase()}">${nome}</li>`)
             .join('');
 
-        campoClientesRenovados.innerHTML = `
-            <span class="titulo-clientes-renovados">Clientes renovados hoje:</span>
-            <ul>${listaClientes}</ul>
-        `;
-
-        if (typeof adicionarEventoScrollClientes === "function") {
-            adicionarEventoScrollClientes();
-        }
+        campo.innerHTML = `<span class="titulo-clientes-renovados">Clientes renovados hoje:</span><ul>${lista}</ul>`;
+        if (typeof adicionarEventoScrollClientes === "function") adicionarEventoScrollClientes();
     } else {
-        campoClientesRenovados.innerHTML = '<span class="nenhum-cliente-renovado">Nenhum cliente renovado hoje</span>';
-    }
-}
-
-function exibirClientesAlterados() {
-    const hoje = new Date().toLocaleDateString('pt-BR');
-    const campoClientesAlterados = document.getElementById('infoClientesAlterados');
-    
-    if (!campoClientesAlterados) return;
-
-    const clientesAlteradosRaw = JSON.parse(localStorage.getItem('clientesAlterados')) || [];
-    // Filtra apenas as alterações de hoje
-    const registroHoje = clientesAlteradosRaw.find(c => c.data === hoje);
-
-    if (registroHoje && registroHoje.nomes.length > 0) {
-        // Garantir que nomes sejam únicos
-        const nomesUnicos = [...new Set(registroHoje.nomes.map(item => item.nome))];
-        
-        const listaClientes = nomesUnicos.map(nome =>
-            `<li class="cliente-scroll" data-nome="${nome.toLowerCase()}">${nome}</li>`
-        ).join('');
-
-        campoClientesAlterados.innerHTML = `
-            <span class="titulo-clientes-renovados">Clientes alterados hoje:</span>
-            <ul>${listaClientes}</ul>`;
-
-        if (typeof adicionarEventoScrollClientes === "function") {
-            adicionarEventoScrollClientes();
-        }
-    } else {
-        campoClientesAlterados.innerHTML = '<span class="nenhum-cliente-renovado">Nenhum cliente alterado hoje</span>';
+        campo.innerHTML = '<span class="nenhum-cliente-renovado">Nenhum cliente renovado hoje</span>';
     }
 }
 
@@ -1032,40 +1027,23 @@ localStorage.setItem('clientesAlterados', JSON.stringify(clientesAlterados));
 exibirClientesAlterados();
 }
 
-function registrarClienteAlterado(nome) {
-    const hoje = new Date().toLocaleDateString('pt-BR');
-    let clientesAlterados = JSON.parse(localStorage.getItem('clientesAlterados')) || [];
-    let clientesRenovados = JSON.parse(localStorage.getItem('clientesRenovadosHoje')) || { data: hoje, nomes: [] };
-    const clienteJaRenovado = clientesRenovados.nomes.some(c => c.nome === nome);
-
-    if (clienteJaRenovado) {
-        return;
-    }
-    let clientesHoje = clientesAlterados.find(c => c.data === hoje);
-    if (!clientesHoje) {
-        clientesHoje = { data: hoje, nomes: [] };
-        clientesAlterados.push(clientesHoje);
-    }
-    if (!clientesHoje.nomes.some(c => c.nome === nome)) {
-        clientesHoje.nomes.push({ nome });
-        localStorage.setItem('clientesAlterados', JSON.stringify(clientesAlterados));
-        exibirClientesAlterados();
-    }
-}
-
 function exibirClientesAlterados() {
-    const clientesAlterados = JSON.parse(localStorage.getItem('clientesAlterados')) || [];
     const hoje = new Date().toLocaleDateString('pt-BR');
-    const clientesHoje = clientesAlterados.find(c => c.data === hoje);
-    const campoClientesAlterados = document.getElementById('infoClientes');
+    const campo = document.getElementById('infoClientes2'); // <--- ID DIFERENTE
+    if (!campo) return;
 
-    if (clientesHoje && clientesHoje.nomes.length > 0) {
-        const nomesUnicos = [...new Set(clientesHoje.nomes.map(cliente => cliente.nome))];
-        const listaClientes = nomesUnicos.map(nome => `<li class="cliente-scroll" data-nome="${nome.toLowerCase()}">${nome}</li>`).join('');
-        campoClientesAlterados.innerHTML = `<span class="titulo-clientes-renovados">Clientes renovados hoje:</span><ul>${listaClientes}</ul>`;
-        adicionarEventoScrollClientes();
+    let alterados = JSON.parse(localStorage.getItem('clientesAlterados')) || [];
+    let registroHoje = alterados.find(c => c.data === hoje);
+
+    if (registroHoje && registroHoje.nomes.length > 0) {
+        const lista = registroHoje.nomes
+            .map(obj => `<li class="cliente-scroll" data-nome="${obj.nome.toLowerCase()}">${obj.nome}</li>`)
+            .join('');
+
+        campo.innerHTML = `<span class="titulo-clientes-alterados">Outras alterações hoje:</span><ul>${lista}</ul>`;
+        if (typeof adicionarEventoScrollClientes === "function") adicionarEventoScrollClientes();
     } else {
-        campoClientesAlterados.innerHTML = '<span class="nenhum-cliente-renovado">Nenhum cliente renovado hoje</span>';
+        campo.innerHTML = '<span class="nenhum-cliente-renovado">Nenhuma alteração de cadastro hoje</span>';
     }
 }
 
@@ -1297,69 +1275,6 @@ function mostrarMensagemSucesso(mensagem) {
     setTimeout(() => {
         mensagemElemento.remove();
     }, 5000);
-}
-
-function carregarPagina() {
-    const clientes = carregarClientes();
-    const agora = new Date();
-
-    const clientesOrdenados = {
-        doisDias: [],
-        hoje: [],
-        vencidos: [],
-        outros: []
-    };
-
-    clientes.forEach(cliente => {
-        let dataVencimento = new Date(cliente.data);
-
-        if (cliente.hora) {
-            const [h, m] = cliente.hora.split(":");
-            dataVencimento.setHours(parseInt(h), parseInt(m), 0, 0);
-        } else {
-            dataVencimento.setHours(23, 59, 59, 999);
-        }
-
-        if (agora > dataVencimento) {
-            clientesOrdenados.vencidos.push(cliente);
-        } else {
-            const diffMs = dataVencimento.setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0);
-            const diferencaDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-            if (diferencaDias === 0) {
-                clientesOrdenados.hoje.push(cliente);
-            } else if (diferencaDias === 2) {
-                clientesOrdenados.doisDias.push(cliente);
-            } else {
-                clientesOrdenados.outros.push(cliente);
-            }
-        }
-    });
-
-    const tabela = document.getElementById('corpoTabela');
-    tabela.innerHTML = '';
-
-    // Sempre no topo → faltam 2 dias e vencem hoje
-    clientesOrdenados.doisDias.forEach(cliente => {
-        adicionarLinhaTabela(cliente.nome, cliente.telefone, cliente.data, cliente.hora || "");
-    });
-
-    clientesOrdenados.hoje.forEach(cliente => {
-        adicionarLinhaTabela(cliente.nome, cliente.telefone, cliente.data, cliente.hora || "");
-    });
-
-    // Depois os outros
-    clientesOrdenados.outros.forEach(cliente => {
-        adicionarLinhaTabela(cliente.nome, cliente.telefone, cliente.data, cliente.hora || "");
-    });
-
-    // Sempre no final → vencidos
-    clientesOrdenados.vencidos.forEach(cliente => {
-        adicionarLinhaTabela(cliente.nome, cliente.telefone, cliente.data, cliente.hora || "");
-    });
-
-    atualizarInfoClientes();
-    exibirClientesRenovadosHoje();
 }
 
 // --- EXPORTAR CLIENTES ---
@@ -1812,7 +1727,7 @@ function salvarEdicaoCliente() {
     const novaHora = document.getElementById("editHora").value;
 
     if (!novoNome || !novoTelefone || !novaDataRaw) {
-        alert("Preencha todos os campos obrigatórios.");
+        mostrarToast("⚠️ Preencha todos os campos!", "#ff9800");
         return;
     }
 
@@ -1823,30 +1738,24 @@ function salvarEdicaoCliente() {
         const clienteAnterior = clientes[clienteIndex];
         let mensagensFeedback = [];
 
-        // 1. Tratamento da Data (Converte AAAA-MM-DD do input para DD/MM/AAAA)
+        // 1. Tratamento da Data
         const partesData = novaDataRaw.split('-');
         const novaDataFormatadaStr = `${partesData[2]}/${partesData[1]}/${partesData[0]}`;
 
-        // Lógica de Renovação: Se a data mudou, registramos na lista de renovados
+        // Lógica de Renovação
         if (clienteAnterior.data !== novaDataFormatadaStr) {
-            mensagensFeedback.push("Cliente renovado com sucesso ✅");
-            
-            // Registra na lista de "Clientes renovados hoje"
+            mensagensFeedback.push("Cliente renovado ✅");
             if (typeof registrarClienteRenovadoHoje === "function") {
                 registrarClienteRenovadoHoje(novoNome);
             }
         }
 
-        // 2. Mudança de Nome (Importante para o Firebase)
+        // 2. Mudança de Nome
         if (nomeAntigo.toLowerCase() !== novoNome) {
-            mensagensFeedback.push("Nome alterado com sucesso ✅");
-            
-            // Se o nome mudou, removemos o registro antigo no Firebase
+            mensagensFeedback.push("Nome alterado ✅");
             if (typeof removerClienteDoFirebase === "function") {
                 removerClienteDoFirebase(nomeAntigo);
             }
-            
-            // Opcional: Registrar como alteração de cadastro
             if (typeof registrarClienteAlterado === "function") {
                 registrarClienteAlterado(novoNome);
             }
@@ -1854,38 +1763,72 @@ function salvarEdicaoCliente() {
 
         // 3. Mudança de Telefone
         if (clienteAnterior.telefone !== novoTelefone) {
-            if (nomeAntigo.toLowerCase() === novoNome) { // Só add se o nome não mudou (evitar duplicar alertas)
-                mensagensFeedback.push("Telefone alterado com sucesso ✅");
+            if (nomeAntigo.toLowerCase() === novoNome) {
+                mensagensFeedback.push("Telefone alterado ✅");
             }
         }
 
-        // Criamos o objeto atualizado no padrão que o Firebase aceita (Data como String)
         const clienteAtualizado = {
             nome: novoNome,
             telefone: novoTelefone,
-            data: novaDataFormatadaStr, // Salva "DD/MM/AAAA"
+            data: novaDataFormatadaStr,
             hora: novaHora || ""
         };
 
-        // Salva localmente no array e no LocalStorage
         clientes[clienteIndex] = clienteAtualizado;
         salvarClientes(clientes);
 
         // 4. Sincroniza com o Firebase
         atualizarDataNoFirebase(clienteAtualizado)
             .then(() => {
+                // FEEDBACK BONITO (TOAST)
                 if (mensagensFeedback.length > 0) {
-                    alert(mensagensFeedback.join('\n'));
+                    mostrarToast(mensagensFeedback.join(' | '));
                 } else {
-                    alert("Alterações salvas com sucesso!");
+                    mostrarToast("Alterações salvas! ✅");
                 }
-                window.location.reload(); // Recarrega para atualizar tabela e listas
+
+                // ATUALIZAÇÃO DA INTERFACE
+                if (typeof atualizarTabelaOrdenada === "function") {
+                    atualizarTabelaOrdenada();
+                }
+
+                if (typeof exibirClientesRenovadosHoje === "function") {
+                    exibirClientesRenovadosHoje();
+                }
+
+                if (typeof fecharModalEditar === "function") {
+                    fecharModalEditar();
+                }
             })
             .catch(err => {
-                console.error("Erro ao sincronizar com Firebase:", err);
-                window.location.reload(); 
+                console.error("Erro ao sincronizar:", err);
+                mostrarToast("Erro ao sincronizar ❌", "#f44336");
+                setTimeout(() => window.location.reload(), 2000);
             });
     }
+}
+
+function mostrarToast(mensagem) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-card';
+    // Removi a linha toast.style.backgroundColor para usar a do CSS
+    toast.innerHTML = `<span>${mensagem}</span>`;
+    
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = "toastFadeOut 0.4s forwards";
+        setTimeout(() => toast.remove(), 400);
+    }, 3000);
 }
 
 // 1. Função que apenas retorna o ID se ele já existir
