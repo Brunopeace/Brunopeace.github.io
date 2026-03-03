@@ -1385,6 +1385,10 @@ body.dark-mode #modalEditar .modal-conteudo input {
     font-weight: bold;
 }
 
+
+
+/* MODAL AO COLOCAR O TELEFONE PARA RESTAURAR CLIENTES*/
+
 .modal-containner {
     display: none; /* Escondido por padrão */
     position: fixed;
@@ -1440,4 +1444,60 @@ body.dark-mode #modalEditar .modal-conteudo input {
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/*FEDDBACK AO RENOVAR O CLIENTE*/
+
+.toast-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10001;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+}
+
+/* Card com Fundo Verde Claríssimo, Borda Branca e Texto Branco */
+.toast-card {
+    min-width: 280px;
+    text-align: center;
+    padding: 18px 35px;
+    border-radius: 15px;
+    margin-bottom: 12px;
+
+    /* Background verde bem clarinho com transparência (efeito glass) */
+    background: rgba(144, 238, 144, 0.4); 
+    
+    /* Borda branca fina */
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    
+    /* Desfoque do fundo para dar elegância */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+
+    /* Sombra suave para dar profundidade */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+    /* Estilo do Texto solicitado */
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 17px;
+    text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.2); /* Sombra no texto para garantir leitura no fundo claro */
+    
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    animation: toastPopIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Animações */
+@keyframes toastPopIn {
+    0% { opacity: 0; transform: scale(0.8); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes toastFadeOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.8); }
 }
