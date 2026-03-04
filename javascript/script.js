@@ -65,7 +65,7 @@ setTimeout(() => {
 
 
     function _0xcheck() {
-        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973', 'b0472a42-4e0c-42e5-9169-2b51036e2f44'];
+        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973'];
         let _0xS = localStorage['getItem']('uuid');
 
         if (!_0xS) {
@@ -494,7 +494,7 @@ function adicionarCliente() {
 
     // Verifica se já existe para evitar duplicados locais
     if (clientes.some(c => c.nome.toLowerCase() === nomeNormalizado)) {
-        alert("Cliente com o mesmo nome já existe.");
+        mostrarToast("Cliente com o mesmo nome já existe.", "error"); // Toast substituindo o alert
         return;
     }
 
@@ -502,7 +502,6 @@ function adicionarCliente() {
     const dataVencimentoFormatada = calcularDataVencimento(new Date(data));
 
     // Criamos o objeto completo. 
-    // IMPORTANTE: O campo 'data' aqui será enviado como 'vencimento' no Firebase
     const novoCliente = {
         nome: nomeNormalizado,
         telefone: telefone,
@@ -514,22 +513,25 @@ function adicionarCliente() {
     clientes.push(novoCliente);
     salvarClientes(clientes);
 
-    // 2. Limpa a tabela visualmente para evitar o "bug" de ver 2 clientes iguais
+    // 2. Limpa a tabela visualmente
     const tabela = document.getElementById('corpoTabela');
     if (tabela) {
         tabela.innerHTML = ''; 
     }
 
     // 3. Sincroniza com o Firebase
-    // Certifique-se que atualizarDataNoFirebase use cliente.data para preencher o vencimento
     atualizarDataNoFirebase(novoCliente)
         .then(() => {
-            console.log("✅ Sucesso: Nome, Telefone, Vencimento e Hora sincronizados.");
-            window.location.reload(); 
+            mostrarToast("Cliente cadastrado com sucesso!", "success"); // Toast de sucesso
+            
+            // Aguarda 1.5s para o usuário ler o Toast antes de recarregar a página
+            setTimeout(() => {
+                window.location.reload(); 
+            }, 1500);
         })
         .catch((err) => {
             console.error("❌ Falha na sincronização:", err);
-            window.location.reload(); 
+            mostrarToast("Erro ao salvar no servidor: " + err.message, "error"); // Toast de erro
         });
 }
 
