@@ -1909,17 +1909,29 @@ function deduzirCredito() {
     }
 }
 
-// 4. Função para editar (Permite resetar ou ajustar saldo)
+// --- FUNÇÃO PARA EDITAR CRÉDITOS E VALORES ---
 function editarCreditos() {
-    const valorAtual = localStorage.getItem("meus_creditos") || 1500;
-    const novoValor = prompt("Digite a nova quantidade de créditos:", valorAtual);
-    
-    if (novoValor !== null && !isNaN(novoValor)) {
-        localStorage.setItem("meus_creditos", novoValor);
-        // Ao editar manualmente, é comum resetar o ganho acumulado
-        localStorage.setItem("valor_acumulado", 0); 
+    const creditosAtuais = localStorage.getItem("meus_creditos") || 1500;
+    const valorAtual = localStorage.getItem("valor_acumulado") || 0;
+
+    // Pede a nova quantidade de créditos
+    const novoCredito = prompt("Digite a nova quantidade de créditos:", creditosAtuais);
+    if (novoCredito === null) return; // Usuário cancelou
+
+    // Pede o novo valor em reais
+    const novoValor = prompt("Digite o valor acumulado em R$:", valorAtual);
+    if (novoValor === null) return; // Usuário cancelou
+
+    // Validação
+    if (!isNaN(novoCredito) && !isNaN(novoValor)) {
+        localStorage.setItem("meus_creditos", novoCredito);
+        localStorage.setItem("valor_acumulado", novoValor);
         
-        carregarCreditos();
+        // Atualiza a tela imediatamente
+        atualizarDisplayCreditos(parseInt(novoCredito), parseFloat(novoValor));
+        mostrarToast("Saldo atualizado manualmente!", "success");
+    } else {
+        mostrarToast("Erro: Valores inválidos!", "error");
     }
 }
 
