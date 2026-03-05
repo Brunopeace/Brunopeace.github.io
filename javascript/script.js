@@ -22,7 +22,6 @@ if ("serviceWorker" in navigator) {
     });
 }
 
-   
   /* código para instalar o aplicativo */
   let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -62,7 +61,6 @@ setTimeout(() => {
             return v ;
         });
     }
-
 
     function _0xcheck() {
         const _0xU = ['31151281541-1411614-410112-1115514-78126419810973'];
@@ -941,6 +939,7 @@ function renovarCliente(nome) {
         clientesHoje.nomes.push(nome);
         localStorage.setItem('clientesRenovadosHoje', JSON.stringify(clientesHoje));
         exibirClientesRenovadosHoje();
+        
     }
 }
 
@@ -1122,8 +1121,6 @@ function atualizarInfoClientes() {
     `;
 }
 
-
-// 🔹 Função genérica para contar clientes com base em condição
 // 🔹 Função corrigida para contar clientes tratando a String de data
 function contarClientesPorCondicao(condicaoCallback) {
     const agora = new Date();
@@ -1632,7 +1629,6 @@ async function registrarToken() {
 // Garante que o registro aconteça ao carregar a página
 window.addEventListener("load", registrarToken);
 
-
 // Salvar token no Realtime Database
 function salvarTokenNoRealtime(token) {
     const idDono = obterIdDono(); // Pega o id do dono (seu telefone)
@@ -1744,6 +1740,7 @@ function salvarEdicaoCliente() {
             mensagensFeedback.push("Cliente renovado ✅");
             if (typeof registrarClienteRenovadoHoje === "function") {
                 registrarClienteRenovadoHoje(novoNome);
+                deduzirCredito();
             }
         }
 
@@ -1860,3 +1857,71 @@ function confirmarIdDono() {
         alert("Por favor, digite um número de telefone válido com DDD.");
     }
 }
+
+// Valor fixo de cada crédito
+const VALOR_POR_RENOVACAO = 9.00;
+
+// 1. Atualiza os dois displays na tela
+function atualizarDisplayCreditos(quantidade, valorTotal) {
+    document.getElementById("displayQuantidade").innerText = quantidade;
+    
+    // Formata o valor acumulado em Reais (R$ 0,00)
+    document.getElementById("displayReais").innerText = `R$ ${valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+}
+
+// 2. Carrega ao abrir o sistema
+function carregarCreditos() {
+    let creditos = localStorage.getItem("meus_creditos");
+    let valorAcumulado = localStorage.getItem("valor_acumulado");
+    
+    // Se for a primeira vez, inicia com 1500 créditos e R$ 0,00
+    if (creditos === null) {
+        creditos = 1500;
+        localStorage.setItem("meus_creditos", creditos);
+    }
+    if (valorAcumulado === null) {
+        valorAcumulado = 0.00;
+        localStorage.setItem("valor_acumulado", valorAcumulado);
+    }
+    
+    atualizarDisplayCreditos(parseInt(creditos), parseFloat(valorAcumulado));
+}
+
+// 3. Função para ser chamada na Renovação (Deduz 1 crédito e SOMA R$ 9,00)
+function deduzirCredito() {
+    let creditos = parseInt(localStorage.getItem("meus_creditos")) || 1500;
+    let valorAcumulado = parseFloat(localStorage.getItem("valor_acumulado")) || 0.00;
+    
+    if (creditos > 0) {
+        creditos -= 1;           // Diminui o crédito
+        valorAcumulado += VALOR_POR_RENOVACAO; // Soma o valor ganho
+        
+        // Salva os novos valores
+        localStorage.setItem("meus_creditos", creditos);
+        localStorage.setItem("valor_acumulado", valorAcumulado);
+        
+        // Atualiza a tela
+        atualizarDisplayCreditos(creditos, valorAcumulado);
+        
+        mostrarToast("Cliente renovado! +R$ 9,00", "success");
+    } else {
+        mostrarToast("Créditos esgotados!", "error");
+    }
+}
+
+// 4. Função para editar (Permite resetar ou ajustar saldo)
+function editarCreditos() {
+    const valorAtual = localStorage.getItem("meus_creditos") || 1500;
+    const novoValor = prompt("Digite a nova quantidade de créditos:", valorAtual);
+    
+    if (novoValor !== null && !isNaN(novoValor)) {
+        localStorage.setItem("meus_creditos", novoValor);
+        // Ao editar manualmente, é comum resetar o ganho acumulado
+        localStorage.setItem("valor_acumulado", 0); 
+        
+        carregarCreditos();
+    }
+}
+
+// Inicia ao carregar a página
+document.addEventListener("DOMContentLoaded", carregarCreditos);
