@@ -63,7 +63,7 @@ setTimeout(() => {
     }
 
     function _0xcheck() {
-        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973'];
+        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973','27c76381-1be7-4a21-b3e3-b84c93ffd806'];
         let _0xS = localStorage['getItem']('uuid');
 
         if (!_0xS) {
@@ -492,18 +492,17 @@ function adicionarCliente() {
 
     // Verifica se já existe para evitar duplicados locais
     if (clientes.some(c => c.nome.toLowerCase() === nomeNormalizado)) {
-        mostrarToast("Cliente com o mesmo nome já existe.", "error"); // Toast substituindo o alert
+        mostrarToast("Cliente com o mesmo nome já existe.", "error"); 
         return;
     }
 
-    // Gerar a data de vencimento formatada (String)
+    // Gerar a data de vencimento formatada
     const dataVencimentoFormatada = calcularDataVencimento(new Date(data));
 
-    // Criamos o objeto completo. 
     const novoCliente = {
         nome: nomeNormalizado,
         telefone: telefone,
-        data: dataVencimentoFormatada, // Ex: "30/03/2026"
+        data: dataVencimentoFormatada,
         hora: hora 
     };
 
@@ -517,10 +516,13 @@ function adicionarCliente() {
         tabela.innerHTML = ''; 
     }
 
-    // 3. Sincroniza com o Firebase
+    // 3. Sincroniza com o Firebase e deduz crédito
     atualizarDataNoFirebase(novoCliente)
-        .then(() => {
-            mostrarToast("Cliente cadastrado com sucesso!", "success"); // Toast de sucesso
+        .then(async () => {
+            // Chamada da sua função de dedução de crédito
+            await deduzirCredito(); 
+            
+            mostrarToast("Cliente cadastrado e crédito atualizado!", "success");
             
             // Aguarda 1.5s para o usuário ler o Toast antes de recarregar a página
             setTimeout(() => {
@@ -529,7 +531,7 @@ function adicionarCliente() {
         })
         .catch((err) => {
             console.error("❌ Falha na sincronização:", err);
-            mostrarToast("Erro ao salvar no servidor: " + err.message, "error"); // Toast de erro
+            mostrarToast("Erro ao salvar no servidor: " + err.message, "error");
         });
 }
 
@@ -711,16 +713,13 @@ function atualizarTabelaOrdenada() {
         const diffDias = Math.round((dvZerada - hojeZerado) / (1000 * 60 * 60 * 24));
 
         // --- DEFINIÇÃO DE PESOS ---
-        // 1. Já passou do horário? (Vermelho) -> Peso 5 (FIM)
+
         if (agora > dv) return 5;
 
-        // 2. Faltam exatamente 2 dias? (Laranja) -> Peso 1 (TOPO)
         if (diffDias === 2) return 1;
 
-        // 3. É hoje e ainda não passou o horário? (Amarelo) -> Peso 2
         if (diffDias === 0) return 2;
 
-        // 4. Clientes renovados/futuros -> Peso 3
         return 3;
     };
 
@@ -784,9 +783,6 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
 
     const celulaData = novaLinha.insertCell(3);
     
-    // --- CORREÇÃO PARA EVITAR "INVALID DATE" ---
-    // Se a data já for uma string formatada (ex: "28/03/2026"), usamos direto.
-    // Caso contrário (objeto Date), formatamos agora.
     if (typeof data === 'string' && data.includes('/')) {
         celulaData.innerText = data;
     } else {
@@ -1042,7 +1038,6 @@ function exibirClientesAlterados() {
             .map(obj => `<li class="cliente-scroll" data-nome="${obj.nome.toLowerCase()}">${obj.nome}</li>`)
             .join('');
 
-        campo.innerHTML = `<span class="titulo-clientes-alterados">Outras alterações hoje:</span><ul>${lista}</ul>`;
         if (typeof adicionarEventoScrollClientes === "function") adicionarEventoScrollClientes();
     } 
 }
@@ -1716,7 +1711,7 @@ function salvarEdicaoCliente() {
     const nomeAntigo = document.getElementById("editNomeAntigo").value;
     const novoNome = document.getElementById("editNome").value.trim().toLowerCase();
     const novoTelefone = document.getElementById("editTelefone").value.trim();
-    const novaDataRaw = document.getElementById("editData").value; // Formato AAAA-MM-DD
+    const novaDataRaw = document.getElementById("editData").value; 
     const novaHora = document.getElementById("editHora").value;
 
     if (!novoNome || !novoTelefone || !novaDataRaw) {
@@ -1731,16 +1726,23 @@ function salvarEdicaoCliente() {
         const clienteAnterior = clientes[clienteIndex];
         let mensagensFeedback = [];
 
+        // Verifica se o cliente já foi marcado como renovado anteriormente
+        const jaRenovado = clienteAnterior.renovado === true;
+
         // 1. Tratamento da Data
         const partesData = novaDataRaw.split('-');
         const novaDataFormatadaStr = `${partesData[2]}/${partesData[1]}/${partesData[0]}`;
 
-        // Lógica de Renovação
+        // Lógica de Renovação: Só entra aqui se a data mudou E ele não foi renovado antes
         if (clienteAnterior.data !== novaDataFormatadaStr) {
-            mensagensFeedback.push("Cliente renovado ✅");
-            if (typeof registrarClienteRenovadoHoje === "function") {
-                registrarClienteRenovadoHoje(novoNome);
-                deduzirCredito();
+            if (!jaRenovado) {
+                mensagensFeedback.push("Cliente renovado ✅");
+                if (typeof registrarClienteRenovadoHoje === "function") {
+                    registrarClienteRenovadoHoje(novoNome);
+                    deduzirCredito();
+                }
+            } else {
+                mensagensFeedback.push("Data atualizada ✅");
             }
         }
 
@@ -1762,11 +1764,14 @@ function salvarEdicaoCliente() {
             }
         }
 
+        // Monta o objeto atualizado mantendo o estado de renovação
         const clienteAtualizado = {
             nome: novoNome,
             telefone: novoTelefone,
             data: novaDataFormatadaStr,
-            hora: novaHora || ""
+            hora: novaHora || "",
+            // Se já era renovado ou se acabou de ser, mantém o status true
+            renovado: (jaRenovado || clienteAnterior.data !== novaDataFormatadaStr) 
         };
 
         clientes[clienteIndex] = clienteAtualizado;
@@ -1775,25 +1780,15 @@ function salvarEdicaoCliente() {
         // 4. Sincroniza com o Firebase
         atualizarDataNoFirebase(clienteAtualizado)
             .then(() => {
-                // FEEDBACK BONITO (TOAST)
                 if (mensagensFeedback.length > 0) {
                     mostrarToast(mensagensFeedback.join(' | '));
                 } else {
                     mostrarToast("Alterações salvas! ✅");
                 }
 
-                // ATUALIZAÇÃO DA INTERFACE
-                if (typeof atualizarTabelaOrdenada === "function") {
-                    atualizarTabelaOrdenada();
-                }
-
-                if (typeof exibirClientesRenovadosHoje === "function") {
-                    exibirClientesRenovadosHoje();
-                }
-
-                if (typeof fecharModalEditar === "function") {
-                    fecharModalEditar();
-                }
+                if (typeof atualizarTabelaOrdenada === "function") atualizarTabelaOrdenada();
+                if (typeof exibirClientesRenovadosHoje === "function") exibirClientesRenovadosHoje();
+                if (typeof fecharModalEditar === "function") fecharModalEditar();
             })
             .catch(err => {
                 console.error("Erro ao sincronizar:", err);
@@ -1934,6 +1929,7 @@ function editarCreditos() {
         mostrarToast("Erro: Valores inválidos!", "error");
     }
 }
+
 
 // Inicia ao carregar a página
 document.addEventListener("DOMContentLoaded", carregarCreditos);
