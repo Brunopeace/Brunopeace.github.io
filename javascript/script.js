@@ -1403,41 +1403,41 @@ async function realizarBuscaNoFirebase(idDono) {
         btn.disabled = true;
         btn.innerText = "Buscando dados...";
         
+        // 1. Busca no Firebase
         const snapshot = await firebase.database().ref('usuarios/' + idDono + '/clientes').once('value');
         const dadosFirebase = snapshot.val();
 
+        // 2. Validação: Se não encontrou, avisa e para. 
+        // O MODAL CONTINUA ABERTO AQUI.
         if (!dadosFirebase) {
             alert("Nenhum backup encontrado para este número.");
             btn.innerText = textoOriginal;
             btn.disabled = false;
-            return;
+            return; 
         }
 
+        // 3. Processamento dos dados
         const novosClientes = [];
         
         Object.keys(dadosFirebase).forEach(nomeChave => {
             const clienteFb = dadosFirebase[nomeChave];
             let dataFinal;
             
-            // LÓGICA DE TRATAMENTO DE DATA (Suporta ISO e Brasileiro)
             const dataRaw = clienteFb.vencimento || clienteFb.data;
 
             if (dataRaw && typeof dataRaw === 'string') {
                 if (dataRaw.includes('T')) {
-                    // Se for formato ISO (2026-05-01T03:00:00.000Z)
                     dataFinal = new Date(dataRaw);
                 } else if (dataRaw.includes('/')) {
-                    // Se for formato Brasileiro (02/04/2026)
                     const partes = dataRaw.split('/');
                     dataFinal = new Date(partes[2], partes[1] - 1, partes[0]);
                 } else {
                     dataFinal = new Date(dataRaw);
                 }
             } else {
-                dataFinal = new Date(); // Fallback
+                dataFinal = new Date(); 
             }
 
-            // Se a data resultou em "Invalid Date", coloca a data de hoje para não quebrar
             if (isNaN(dataFinal.getTime())) {
                 dataFinal = new Date();
             }
@@ -1445,24 +1445,32 @@ async function realizarBuscaNoFirebase(idDono) {
             novosClientes.push({
                 nome: nomeChave, 
                 telefone: clienteFb.telefone || "",
-                data: dataFinal.toISOString(), // Salvamos como string para padronizar
+                data: dataFinal.toISOString(), 
                 hora: clienteFb.hora || "" 
             });
         });
 
+        // 4. SUCESSO: Agora sim, salvamos e fechamos
         localStorage.setItem("id_dono_app", idDono);
         salvarClientes(novosClientes);
         
         alert(`Sucesso! ${novosClientes.length} clientes restaurados.`);
+        
+        // Agora fechamos o modal e recarregamos
+        const modal = document.getElementById("modalIdDono");
+        if (modal) modal.style.display = "none";
+        
         window.location.reload();
 
     } catch (error) {
+        // Se der erro de rede, o modal também permanece aberto
         console.error("Erro na sincronização:", error);
         alert("Erro ao conectar com o banco de dados.");
         btn.innerText = textoOriginal;
         btn.disabled = false;
     }
 }
+
 
 async function excluirClientesSelecionados() {
     const checkboxes = document.querySelectorAll('.cliente-checkbox:checked');
@@ -1834,24 +1842,74 @@ function verificarIdentificador() {
     }
 }
 
-// 3. Função chamada pelo botão do Modal
+// Configurações Globais
+const TELEFONE_MASTER = "81982258462";
+const SENHA_MASTER = "9436631200"; // Altere conforme necessário
+
+// 2. A sua função de restaurar (continua igual, para o botão "Restaurar Meus Dados")
 function confirmarIdDono() {
     const input = document.getElementById("inputTelefoneDono");
-    let telefone = input.value.replace(/\D/g, ''); // Limpa caracteres especiais
+    let telefone = input.value.replace(/\D/g, ''); 
+    const TELEFONE_MASTER = "81982258462";
 
-    if (telefone.length >= 8) {
-        // Salva o ID
-        localStorage.setItem("id_dono_app", telefone);
-        
-        // Esconde o modal
+    if (telefone.length < 8) {
+        alert("Por favor, digite um número de telefone válido com DDD.");
+        return;
+    }
+
+    // Se for o master, abre o modal de senha (o outro modal)
+    if (telefone === TELEFONE_MASTER) {
+        document.getElementById("modalSenhaAdm").style.display = "flex"; 
+        return; 
+    }
+
+    // Se não for master, tenta restaurar dados
+    realizarBuscaNoFirebase(telefone);
+}
+
+// 1. Função para usuários novos (Simples, sem buscar no Firebase)
+function entrarComoNovo() {
+    const input = document.getElementById("inputTelefoneDono");
+    let telefone = input.value.replace(/\D/g, '');
+
+    if (telefone.length < 8) {
+        alert("Por favor, digite um número de telefone válido com DDD.");
+        return;
+    }
+
+    // Salva o ID e inicia o app
+    localStorage.setItem("id_dono_app", telefone);
+    document.getElementById("modalIdDono").style.display = "none";
+    
+    alert("Bem-vindo! Usuário cadastrado com sucesso.");
+    window.location.reload();
+}
+
+function validarSenhaAdm() {
+    const senhaDigitada = document.getElementById("inputSenhaAdm").value;
+
+    if (senhaDigitada === SENHA_MASTER) {
+        // Fecha o modal de senha e o modal de ID
+        document.getElementById("modalSenhaAdm").style.display = "none";
         document.getElementById("modalIdDono").style.display = "none";
         
-        // Chama a função de busca que definimos acima
-        realizarBuscaNoFirebase(telefone);
+        // Segue o fluxo com o número master
+        prosseguirSincronizacao(TELEFONE_MASTER);
     } else {
-        alert("Por favor, digite um número de telefone válido com DDD.");
+        alert("Senha incorreta. Acesso negado.");
+        // Opcional: limpar o campo de senha
+        document.getElementById("inputSenhaAdm").value = "";
     }
 }
+
+// Função única para salvar e buscar (evita duplicar código)
+function prosseguirSincronizacao(telefone) {
+    localStorage.setItem("id_dono_app", telefone);
+    document.getElementById("modalIdDono").style.display = "none";
+    realizarBuscaNoFirebase(telefone);
+}
+
+
 
 // Valor fixo de cada crédito
 const VALOR_POR_RENOVACAO = 9.00;
