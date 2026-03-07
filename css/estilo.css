@@ -913,7 +913,7 @@ h2 {
   100% { transform: scale(1); }
 }
 
-/* styles do modal */
+/* cor, ao digitar o nome do cliente */
 
 #inputNome, #inputTelefone, #inputData {
     color: #005c0c;
@@ -957,9 +957,8 @@ h2 {
 #modalEditar .modal-conteudo input {
     background-color: #ffffff;
     font-weight: bold;
-    color: #2B8E28;
+    color: #005c0c;
 }
-
 
 body.dark-mode #modalEditar .modal-conteudo input {
     background-color: #ffffff;
@@ -1572,4 +1571,22 @@ body.dark-mode #modalEditar .modal-conteudo input {
     color: #4ade80; /* Um verde neon suave para remeter a dinheiro */
     margin-top: 2px;
     font-weight: 500;
+}
+
+/* Input modal senha */
+#inputSenhaAdm {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-sizing: border-box; /* Garante que o padding não quebre o layout */
+    font-size: 16px; /* Evita zoom no iPhone */
+}
+
+/* Entrar como novo usuário */
+.btn-novo {
+    background: radial-gradient(circle, rgb(97, 247, 208), rgb(52, 2, 157)) !important;
+    color: #ffffff;
+    font-weight: bold;
 }
