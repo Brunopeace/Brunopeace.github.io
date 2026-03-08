@@ -63,7 +63,7 @@ setTimeout(() => {
     }
 
     function _0xcheck() {
-        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973','27c76381-1be7-4a21-b3e3-b84c93ffd806'];
+        const _0xU = ['7ef357e1-46f8-465d-8cfe-7f11a6a5e4bd'];
         let _0xS = localStorage['getItem']('uuid');
 
         if (!_0xS) {
@@ -466,7 +466,7 @@ function exibirFeedback(mensagem) {
     }, 4000);
 }
 
-function adicionarCliente() {
+async function adicionarCliente() {
     const nomeInput = document.getElementById('inputNome');
     const telefoneInput = document.getElementById('inputTelefone');
     const dataInput = document.getElementById('inputData');
@@ -474,30 +474,41 @@ function adicionarCliente() {
 
     const nome = nomeInput.value.trim();
     const telefone = telefoneInput.value.trim();
-    const data = dataInput.value;
+    const dataRaw = dataInput.value; 
     const hora = horaInput ? horaInput.value : ""; 
 
-    // Log para conferência técnica
-    console.log("Capturando dados para envio:", { nome, telefone, data, hora });
-
-    let erro = false;
-    erro |= !validarCampo(nomeInput, nome, "Nome do cliente não pode estar vazio.");
-    erro |= !validarCampo(telefoneInput, telefone, "Telefone inválido (11 dígitos).", validarTelefone);
-    erro |= !validarCampo(dataInput, data, "Data inválida. Escolha uma data de vencimento.", validarData);
-
-    if (erro) return;
+    if (!nome || !telefone || !dataRaw) {
+        mostrarToast("⚠️ Preencha todos os campos!", "error");
+        return;
+    }
 
     const nomeNormalizado = nome.toLowerCase(); 
     const clientes = carregarClientes();
 
-    // Verifica se já existe para evitar duplicados locais
     if (clientes.some(c => c.nome.toLowerCase() === nomeNormalizado)) {
-        mostrarToast("Cliente com o mesmo nome já existe.", "error"); 
+        mostrarToast("Cliente já existe.", "error"); 
         return;
     }
 
-    // Gerar a data de vencimento formatada
-    const dataVencimentoFormatada = calcularDataVencimento(new Date(data));
+    const partes = dataRaw.split('-');
+    const dataSelecionada = new Date(partes[0], partes[1] - 1, partes[2]); 
+    
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    // Cálculo de meses
+    let diffMeses = (dataSelecionada.getFullYear() - hoje.getFullYear()) * 12;
+    diffMeses += dataSelecionada.getMonth() - hoje.getMonth();
+
+    let mesesParaCobrar = diffMeses + 1;
+    if (mesesParaCobrar <= 0) mesesParaCobrar = 1;
+    const dataVencimento = new Date(partes[0], partes[1] - 1, partes[2]);
+    dataVencimento.setMonth(dataVencimento.getMonth() + 1);
+
+    const dia = String(dataVencimento.getDate()).padStart(2, '0');
+    const mes = String(dataVencimento.getMonth() + 1).padStart(2, '0');
+    const ano = dataVencimento.getFullYear();
+    const dataVencimentoFormatada = `${dia}/${mes}/${ano}`;
 
     const novoCliente = {
         nome: nomeNormalizado,
@@ -506,32 +517,24 @@ function adicionarCliente() {
         hora: hora 
     };
 
-    // 1. Salva localmente
     clientes.push(novoCliente);
     salvarClientes(clientes);
 
-    // 2. Limpa a tabela visualmente
-    const tabela = document.getElementById('corpoTabela');
-    if (tabela) {
-        tabela.innerHTML = ''; 
-    }
-
-    // 3. Sincroniza com o Firebase e deduz crédito
     atualizarDataNoFirebase(novoCliente)
         .then(async () => {
-            // Chamada da sua função de dedução de crédito
-            await deduzirCredito(); 
+            if (typeof deduzirCredito === "function") {
+                await deduzirCredito(mesesParaCobrar); 
+            }
             
-            mostrarToast("Cliente cadastrado e crédito atualizado!", "success");
+            mostrarToast(`Cadastrado: ${mesesParaCobrar} mês(es) cobrados! ✅`, "success");
             
-            // Aguarda 1.5s para o usuário ler o Toast antes de recarregar a página
             setTimeout(() => {
                 window.location.reload(); 
             }, 1500);
         })
         .catch((err) => {
-            console.error("❌ Falha na sincronização:", err);
-            mostrarToast("Erro ao salvar no servidor: " + err.message, "error");
+            console.error("❌ Erro:", err);
+            mostrarToast("Erro ao salvar.", "error");
         });
 }
 
@@ -667,7 +670,6 @@ function atualizarCorCelulaData(celulaData, data, hora) {
 
     celulaData.classList.remove('red', 'yellow', 'orange');
 
-    // REGRA: Se a hora passou, é Vermelho (mesmo sendo hoje)
     if (agora > dv) {
         celulaData.classList.add('red');
     } 
@@ -1471,7 +1473,6 @@ async function realizarBuscaNoFirebase(idDono) {
     }
 }
 
-
 async function excluirClientesSelecionados() {
     const checkboxes = document.querySelectorAll('.cliente-checkbox:checked');
     const clientes = carregarClientes();
@@ -1719,7 +1720,7 @@ function salvarEdicaoCliente() {
     const nomeAntigo = document.getElementById("editNomeAntigo").value;
     const novoNome = document.getElementById("editNome").value.trim().toLowerCase();
     const novoTelefone = document.getElementById("editTelefone").value.trim();
-    const novaDataRaw = document.getElementById("editData").value; 
+    const novaDataRaw = document.getElementById("editData").value; // Formato AAAA-MM-DD
     const novaHora = document.getElementById("editHora").value;
 
     if (!novoNome || !novoTelefone || !novaDataRaw) {
@@ -1734,58 +1735,66 @@ function salvarEdicaoCliente() {
         const clienteAnterior = clientes[clienteIndex];
         let mensagensFeedback = [];
 
-        // Verifica se o cliente já foi marcado como renovado anteriormente
-        const jaRenovado = clienteAnterior.renovado === true;
+        // 1. Tratamento das Datas para Cálculo de Meses
+        const partesNova = novaDataRaw.split('-'); // [2026, 05, 08]
+        const dataNovaObj = new Date(partesNova[0], partesNova[1] - 1, partesNova[2]);
 
-        // 1. Tratamento da Data
-        const partesData = novaDataRaw.split('-');
-        const novaDataFormatadaStr = `${partesData[2]}/${partesData[1]}/${partesData[0]}`;
+        const partesAntiga = clienteAnterior.data.split('/'); // [08, 03, 2026]
+        const dataAntigaObj = new Date(partesAntiga[2], partesAntiga[1] - 1, partesAntiga[0]);
 
-        // Lógica de Renovação: Só entra aqui se a data mudou E ele não foi renovado antes
+        const novaDataFormatadaStr = `${partesNova[2]}/${partesNova[1]}/${partesNova[0]}`;
+
+        // 2. Lógica de Cálculo de Renovação (Diferença de Meses)
         if (clienteAnterior.data !== novaDataFormatadaStr) {
-            if (!jaRenovado) {
-                mensagensFeedback.push("Cliente renovado ✅");
-                if (typeof registrarClienteRenovadoHoje === "function") {
-                    registrarClienteRenovadoHoje(novoNome);
-                    deduzirCredito();
+            // Calcula quantos meses de diferença
+            let diffMeses = (dataNovaObj.getFullYear() - dataAntigaObj.getFullYear()) * 12;
+            diffMeses += dataNovaObj.getMonth() - dataAntigaObj.getMonth();
+
+            // Só processa se a data for para o futuro
+            if (diffMeses > 0) {
+                const confirmar = confirm(`Detectamos uma renovação de ${diffMeses} mês(es). Deseja descontar ${diffMeses} crédito(s) e somar R$ ${(diffMeses * 9).toFixed(2)}?`);
+                
+                if (confirmar) {
+                    if (typeof deduzirCredito === "function") {
+                        deduzirCredito(diffMeses); // Passa a quantidade de meses detectada
+                    }
+                    if (typeof registrarClienteRenovadoHoje === "function") {
+                        registrarClienteRenovadoHoje(novoNome);
+                    }
+                    mensagensFeedback.push(`Renovado (${diffMeses} meses) ✅`);
+                } else {
+                    mensagensFeedback.push("Data alterada (sem desconto) ✅");
                 }
             } else {
                 mensagensFeedback.push("Data atualizada ✅");
             }
         }
 
-        // 2. Mudança de Nome
+        // 3. Mudança de Nome
         if (nomeAntigo.toLowerCase() !== novoNome) {
             mensagensFeedback.push("Nome alterado ✅");
-            if (typeof removerClienteDoFirebase === "function") {
-                removerClienteDoFirebase(nomeAntigo);
-            }
-            if (typeof registrarClienteAlterado === "function") {
-                registrarClienteAlterado(novoNome);
-            }
+            if (typeof removerClienteDoFirebase === "function") removerClienteDoFirebase(nomeAntigo);
+            if (typeof registrarClienteAlterado === "function") registrarClienteAlterado(novoNome);
         }
 
-        // 3. Mudança de Telefone
-        if (clienteAnterior.telefone !== novoTelefone) {
-            if (nomeAntigo.toLowerCase() === novoNome) {
-                mensagensFeedback.push("Telefone alterado ✅");
-            }
+        // 4. Mudança de Telefone
+        if (clienteAnterior.telefone !== novoTelefone && nomeAntigo.toLowerCase() === novoNome) {
+            mensagensFeedback.push("Telefone alterado ✅");
         }
 
-        // Monta o objeto atualizado mantendo o estado de renovação
+        // Monta o objeto atualizado
         const clienteAtualizado = {
             nome: novoNome,
             telefone: novoTelefone,
             data: novaDataFormatadaStr,
             hora: novaHora || "",
-            // Se já era renovado ou se acabou de ser, mantém o status true
-            renovado: (jaRenovado || clienteAnterior.data !== novaDataFormatadaStr) 
+            renovado: (clienteAnterior.data !== novaDataFormatadaStr) 
         };
 
         clientes[clienteIndex] = clienteAtualizado;
         salvarClientes(clientes);
 
-        // 4. Sincroniza com o Firebase
+        // 5. Sincroniza com o Firebase
         atualizarDataNoFirebase(clienteAtualizado)
             .then(() => {
                 if (mensagensFeedback.length > 0) {
@@ -1842,11 +1851,9 @@ function verificarIdentificador() {
     }
 }
 
-// Configurações Globais
 const TELEFONE_MASTER = "81982258462";
-const SENHA_MASTER = "9436631200"; // Altere conforme necessário
+const SENHA_MASTER = "9436631200";
 
-// 2. A sua função de restaurar (continua igual, para o botão "Restaurar Meus Dados")
 function confirmarIdDono() {
     const input = document.getElementById("inputTelefoneDono");
     let telefone = input.value.replace(/\D/g, ''); 
@@ -1863,11 +1870,9 @@ function confirmarIdDono() {
         return; 
     }
 
-    // Se não for master, tenta restaurar dados
     realizarBuscaNoFirebase(telefone);
 }
-
-// 1. Função para usuários novos (Simples, sem buscar no Firebase)
+    
 function entrarComoNovo() {
     const input = document.getElementById("inputTelefoneDono");
     let telefone = input.value.replace(/\D/g, '');
@@ -1877,7 +1882,6 @@ function entrarComoNovo() {
         return;
     }
 
-    // Salva o ID e inicia o app
     localStorage.setItem("id_dono_app", telefone);
     document.getElementById("modalIdDono").style.display = "none";
     
@@ -1909,25 +1913,26 @@ function prosseguirSincronizacao(telefone) {
     realizarBuscaNoFirebase(telefone);
 }
 
+const VALOR_POR_MES = 9.00;
 
-
-// Valor fixo de cada crédito
-const VALOR_POR_RENOVACAO = 9.00;
-
-// 1. Atualiza os dois displays na tela
 function atualizarDisplayCreditos(quantidade, valorTotal) {
-    document.getElementById("displayQuantidade").innerText = quantidade;
-    
-    // Formata o valor acumulado em Reais (R$ 0,00)
-    document.getElementById("displayReais").innerText = `R$ ${valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+    const displayQuantidade = document.getElementById("displayQuantidade");
+    const displayReais = document.getElementById("displayReais");
+
+    if (displayQuantidade) displayQuantidade.innerText = quantidade;
+    if (displayReais) {
+        displayReais.innerText = `R$ ${valorTotal.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })}`;
+    }
 }
 
-// 2. Carrega ao abrir o sistema
 function carregarCreditos() {
     let creditos = localStorage.getItem("meus_creditos");
     let valorAcumulado = localStorage.getItem("valor_acumulado");
     
-    // Se for a primeira vez, inicia com 1500 créditos e R$ 0,00
+    // Inicialização para novos usuários
     if (creditos === null) {
         creditos = 1500;
         localStorage.setItem("meus_creditos", creditos);
@@ -1940,54 +1945,63 @@ function carregarCreditos() {
     atualizarDisplayCreditos(parseInt(creditos), parseFloat(valorAcumulado));
 }
 
-// 3. Função para ser chamada na Renovação (Deduz 1 crédito e SOMA R$ 9,00)
-function deduzirCredito() {
-    let creditos = parseInt(localStorage.getItem("meus_creditos")) || 1500;
+function deduzirCredito(meses = 1) {
+    // 1. Recupera os valores atuais do LocalStorage ou define padrões
+    let creditos = parseInt(localStorage.getItem("meus_creditos")) || 0;
     let valorAcumulado = parseFloat(localStorage.getItem("valor_acumulado")) || 0.00;
     
-    if (creditos > 0) {
-        creditos -= 1;           // Diminui o crédito
-        valorAcumulado += VALOR_POR_RENOVACAO; // Soma o valor ganho
+    // 2. Cálculos baseados no multiplicador de meses
+    const totalDesconto = meses;
+    const totalGanho = meses * VALOR_POR_MES;
+
+    // 3. Verificação de saldo de créditos
+    if (creditos >= totalDesconto) {
+        // Aplica a dedução e a soma financeira
+        creditos -= totalDesconto;
+        valorAcumulado += totalGanho;
         
-        // Salva os novos valores
+        // 4. Salva os novos valores no LocalStorage para evitar perda ao atualizar
         localStorage.setItem("meus_creditos", creditos);
-        localStorage.setItem("valor_acumulado", valorAcumulado);
+        localStorage.setItem("valor_acumulado", valorAcumulado.toFixed(2));
         
-        // Atualiza a tela
-        atualizarDisplayCreditos(creditos, valorAcumulado);
+        // 5. Atualiza a interface visual
+        if (typeof atualizarDisplayCreditos === "function") {
+            atualizarDisplayCreditos(creditos, valorAcumulado);
+        }
         
-        mostrarToast("Cliente renovado! +R$ 9,00", "success");
+        // Feedback para o usuário
+        const msg = meses > 1 
+            ? `Renovação de ${meses} meses: -${totalDesconto} créditos e +R$ ${totalGanho.toFixed(2)}` 
+            : `Cliente renovado! +R$ ${VALOR_POR_MES.toFixed(2)}`;
+            
+        mostrarToast(msg, "success");
     } else {
-        mostrarToast("Créditos esgotados!", "error");
+        // Caso não haja saldo suficiente
+        mostrarToast(`Saldo insuficiente! Você precisa de ${totalDesconto} créditos.`, "error");
     }
 }
 
-// --- FUNÇÃO PARA EDITAR CRÉDITOS E VALORES ---
 function editarCreditos() {
-    const creditosAtuais = localStorage.getItem("meus_creditos") || 1500;
-    const valorAtual = localStorage.getItem("valor_acumulado") || 0;
+    const credAtuais = localStorage.getItem("meus_creditos") || 1500;
+    const valorAtual = localStorage.getItem("valor_acumulado") || 0.00;
 
-    // Pede a nova quantidade de créditos
-    const novoCredito = prompt("Digite a nova quantidade de créditos:", creditosAtuais);
-    if (novoCredito === null) return; // Usuário cancelou
+    const novoCredito = prompt("Digite a nova quantidade de créditos:", credAtuais);
+    if (novoCredito === null) return;
 
-    // Pede o novo valor em reais
-    const novoValor = prompt("Digite o valor acumulado em R$:", valorAtual);
-    if (novoValor === null) return; // Usuário cancelou
+    const novoValor = prompt("Digite o novo valor total em R$ (use ponto para centavos):", valorAtual);
+    if (novoValor === null) return;
 
-    // Validação
-    if (!isNaN(novoCredito) && !isNaN(novoValor)) {
-        localStorage.setItem("meus_creditos", novoCredito);
-        localStorage.setItem("valor_acumulado", novoValor);
+    const valorLimpo = novoValor.replace(',', '.');
+
+    if (!isNaN(novoCredito) && !isNaN(valorLimpo)) {
+        localStorage.setItem("meus_creditos", parseInt(novoCredito));
+        localStorage.setItem("valor_acumulado", parseFloat(valorLimpo).toFixed(2));
         
-        // Atualiza a tela imediatamente
-        atualizarDisplayCreditos(parseInt(novoCredito), parseFloat(novoValor));
-        mostrarToast("Saldo atualizado manualmente!", "success");
+        carregarCreditos(); // Recarrega os displays
+        mostrarToast("Saldos atualizados manualmente!", "info");
     } else {
-        mostrarToast("Erro: Valores inválidos!", "error");
+        alert("Por favor, insira números válidos.");
     }
 }
 
-
-// Inicia ao carregar a página
 document.addEventListener("DOMContentLoaded", carregarCreditos);
