@@ -367,69 +367,6 @@ ul li:hover {
     transform: scale(0.95);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
-
-.loading-coracao {
-  display:block;
-  position: relative;
-  width: 30px;
-  height: 30px;
-  margin:auto;
-  transform: rotate(45deg);
-  transform-origin: 40px 40px;
-  padding-left: 45px;
-  padding-bottom: 45px;
-}
-
-.loading-coracao span {
-  top: 32px;
-  left: 32px;
-  position: absolute;
-  width: 32px;
-  height: 32px;
-  background: #fd0000;
-  animation: loading-coracao 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
-}
-
-.loading-coracao span:after,
-.loading-coracao span:before {
-  content: " ";
-  position: absolute;
-  display: block;
-  width: 32px;
-  height: 32px;
-  background: #fd0000;
-}
-
-.loading-coracao span:before {
-  left: -24px;
-  border-radius: 50% 0 0 50%;
-}
-
-.loading-coracao span:after {
-  top: -24px;
-  border-radius: 50% 50% 0 0;
-}
-
-@keyframes loading-coracao {
-  0% {
-    transform: scale(0.95);
-  }
-  5% {
-    transform: scale(1.1);
-  }
-  39% {
-    transform: scale(0.85);
-  }
-  45% {
-    transform: scale(1);
-  }
-  60% {
-    transform: scale(0.95);
-  }
-  100% {
-    transform: scale(0.9);
-  }
-}
      
 .clientes-vencidos {
         color: red;
