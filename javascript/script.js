@@ -53,30 +53,32 @@ setTimeout(() => {
     }
 }, 15000);
 
-(function(){
+    (function() {
+    // Gera um identificador único para o dispositivo se não existir
     function _0xuuid() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'['replace'](/[xy]/g, function(c) {
-            const r = Math['floor'](Math['random']() * 16);
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.floor(Math.random() * 16);
             const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v ;
+            return v.toString(16);
         });
     }
 
     function _0xcheck() {
-        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973'];
-        let _0xS = localStorage['getItem']('uuid');
+
+        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973','7ef357e1-46f8-465d-8cfe-7f11a6a5e4bd'];
+        
+        let _0xS = localStorage.getItem('uuid');
 
         if (!_0xS) {
             _0xS = _0xuuid();
-            localStorage['setItem']('uuid', _0xS);
+            localStorage.setItem('uuid', _0xS);
         }
 
-        const _0xA = _0xU['includes'](_0xS);
+        const _0xA = _0xU.includes(_0xS);
 
         if (!_0xA) {
-            console['warn']("Acesso negado para UUID:", _0xS);
-            alert("Acesso Negado. Você não tem permissão para acessar esta página.");
-            window['location']['href'] = 'acessonegado.html';
+            console.warn("Acesso negado para UUID:", _0xS);
+            window.location.href = 'acessonegado.html';
         }
     }
 
