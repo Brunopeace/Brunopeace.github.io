@@ -132,8 +132,7 @@
 <div id="painelContagem" class="painel-contagem-container"></div>
 <div id="infoClientes2" class="slide-in"></div><br>
     <div id="infoClientes" class="slide-in"></div>
-    <div class="table-container slide-in">
-                          
+        
 <button id="toggleLixeira" onclick="alternarLixeira()">Abrir Lixeira</button>
 
                <!--  Display credito-->
@@ -142,12 +141,15 @@
         <span id="displayQuantidade">1500</span> Créditos
     </div>
     <div class="c-reais" id="displayReais">R$ 0,00</div>
-</div>
-
-<br>
+</div>    
+       
 <label for="inputPesquisar" class="label-pesquisa">Pesquisar Cliente <img src="img/lupa.png" class="lupa"></label>
-        <input type="text" id="inputPesquisar" oninput="pesquisarCliente()" placeholder="Por nome / Telefone">
-
+<input type="text" id="inputPesquisar" oninput="pesquisarCliente()" placeholder="Por nome / Telefone">    
+    
+<br>    
+    <!-- tabela começa aqui-->
+<div class="table-container slide-in">
+                          
 <div id="containerLixeira" style="display: none;">
     <div id="quantidadeClientesLixeira"></div>
     
@@ -258,7 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
         action: () => criarHalloween()
       }
     ],
-
 
     init() {
       const hoje = new Date();
