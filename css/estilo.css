@@ -20,6 +20,7 @@ header,
 h1 {
   transition: background-color 1.5s ease, color 1.5s ease, border-color 1.5s ease;
 }
+
 .input-erro {
     border: 2px solid red;
     background-color: #ffe6e6;
@@ -537,11 +538,89 @@ footer {
             /* Limita a largura da logomarca */
             max-width: 300px; 
         }
-       
-       h1 {
-            color: #4CAF50;
-            text-align: center;
-        }
+          
+h1 {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 2.2rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -1px;
+    margin: 20px 0;
+    text-align: center;
+    background: linear-gradient(135deg, #ffffff 30%, #4CAF50 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.3));
+    position: relative;
+    display: inline-block;
+    text-shadow: 0px 0px 15px rgba(76, 175, 80, 0.2); 
+    transition: all 0.3s ease;
+}
+
+h1::after {
+    content: '';
+    display: block;
+    width: 50%;
+    height: 3px;
+    background: #4CAF50;
+    margin: 5px auto 0;
+    border-radius: 10px;
+    opacity: 0.8;
+}
+
+@media (max-width: 600px) {
+    h1 {
+        font-size: 1.6rem;
+        letter-spacing: 0;
+    }
+}
+
+/*modo claro*/
+
+body.light-mode h1 {
+    font-family: 'Poppins', 'Inter', sans-serif;
+    /* 1. AJUSTE DE TELA: Tamanho adaptável para não vazar */
+    font-size: clamp(1.2rem, 5vw, 1.8rem); 
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 25px auto;
+    text-align: center;
+    
+    /* 2. SEGURANÇA: Impede quebra e estouro */
+    display: block;
+    width: 90%; /* Limita a largura para dar margem lateral */
+    max-width: fit-content;
+    white-space: normal; /* Permite quebra se for realmente necessário em telas minúsculas */
+    word-wrap: break-word;
+    position: relative;
+
+    /* 3. GRADIENTE RADIAL: Centro vibrante para bordas sóbrias */
+    background: radial-gradient(
+        circle, 
+        #4caf50 0%,    /* Verde vivo no centro */
+        #2e7d32 60%,   /* Verde médio */
+        #1b5e20 100%   /* Verde profundo nas pontas */
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+
+    /* 4. ESTÉTICA: Sombra suave para o fundo claro */
+    filter: drop-shadow(0px 3px 4px rgba(0, 0, 0, 0.1));
+    
+    transition: all 0.4s ease;
+}
+
+/* Linha decorativa minimalista */
+body.light-mode h1::after {
+    content: '';
+    display: block;
+    width: 50%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #2e7d32, transparent);
+    margin: 8px auto 0;
+    border-radius: 10px;
+}
        
         table {
             width: 100%;
@@ -564,20 +643,23 @@ footer {
             background-color: #d6ffe8;
             color: #333;
         }
+                
         tr:nth-child(even) {
-            background-color: #616161;
+            background-color: #8a8a8a; /* modo claro */
         }
         
         tr:hover {
-            background-color: #007a25;
-            color: #000000;
+            background-color: #007a25; /* modo claro */
+            color: #ffffff;
+            font-weight: bold;
             font-weight: bold;
             transition: background-color 1.5s ease, color 1.5s ease, border-color 1.5s ease;
         }
 
         .orange {
             background-color: orange;
-            color: white;
+            color: #ffffff;
+            font-weight: bold;
             position: relative;
             overflow: hidden;
         }
@@ -609,12 +691,14 @@ footer {
 
         .yellow {
             background-color: yellow;
-            color: black;
+            color: #000000;
+            font-weight: bold;
         }
 
         .red {
             background-color: red;
-            color: white;
+            color: #ffffff;
+            font-weight: bold;
         }
 
         .input-container {
@@ -654,6 +738,7 @@ footer {
 h2 {
        color: #ffffff;
        margin-left: 70px;
+       font-weight: bold;
 }
 
     .input-container input, .input-container label {
@@ -706,13 +791,11 @@ h2 {
 #backup {
        background: linear-gradient(45deg, #1e90ff, #00bfff);
        color: #ffffff;
-    
 }
 
 #backup:hover {
        background: linear-gradient(45deg, #00bfff, #1e90ff);
        color: #ffffff;
-    
 }
 
         button {
@@ -780,7 +863,6 @@ h2 {
         font-size: 0.8em; /* Reduzir o tamanho da fonte da tabela */
     }
 }
-
 
 /* Tela loader escura de fundo */
 #loading {
@@ -1531,4 +1613,5 @@ body.dark-mode #modalEditar .modal-conteudo input {
     background: radial-gradient(circle, rgb(97, 247, 208), rgb(52, 2, 157)) !important;
     color: #ffffff;
     font-weight: bold;
+    font: ;
 }
