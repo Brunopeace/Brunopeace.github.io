@@ -1756,8 +1756,10 @@ function salvarEdicaoCliente() {
     const nomeAntigo = document.getElementById("editNomeAntigo").value;
     const novoNome = document.getElementById("editNome").value.trim().toLowerCase();
     const novoTelefone = document.getElementById("editTelefone").value.trim();
-    const novaDataRaw = document.getElementById("editData").value; // Formato AAAA-MM-DD
+    const novaDataRaw = document.getElementById("editData").value;
     const novaHora = document.getElementById("editHora").value;
+
+    const VALOR_POR_MES = 9.00;
 
     if (!novoNome || !novoTelefone || !novaDataRaw) {
         mostrarToast("⚠️ Preencha todos os campos!", "#ff9800");
@@ -1771,54 +1773,54 @@ function salvarEdicaoCliente() {
         const clienteAnterior = clientes[clienteIndex];
         let mensagensFeedback = [];
 
-        // 1. Tratamento das Datas para Cálculo de Meses
-        const partesNova = novaDataRaw.split('-'); // [2026, 05, 08]
+        const partesNova = novaDataRaw.split('-'); 
         const dataNovaObj = new Date(partesNova[0], partesNova[1] - 1, partesNova[2]);
-
-        const partesAntiga = clienteAnterior.data.split('/'); // [08, 03, 2026]
-        const dataAntigaObj = new Date(partesAntiga[2], partesAntiga[1] - 1, partesAntiga[0]);
-
         const novaDataFormatadaStr = `${partesNova[2]}/${partesNova[1]}/${partesNova[0]}`;
 
-        // 2. Lógica de Cálculo de Renovação (Diferença de Meses)
+        // Lógica de segurança para data "vencido"
+        let dataAntigaObj;
+        if (clienteAnterior.data === "vencido" || !clienteAnterior.data.includes('/')) {
+            dataAntigaObj = new Date();
+        } else {
+            const partesAntiga = clienteAnterior.data.split('/');
+            dataAntigaObj = new Date(partesAntiga[2], partesAntiga[1] - 1, partesAntiga[0]);
+        }
+
+        // 1. Verificação de Renovação
         if (clienteAnterior.data !== novaDataFormatadaStr) {
-            // Calcula quantos meses de diferença
             let diffMeses = (dataNovaObj.getFullYear() - dataAntigaObj.getFullYear()) * 12;
             diffMeses += dataNovaObj.getMonth() - dataAntigaObj.getMonth();
 
-            // Só processa se a data for para o futuro
             if (diffMeses > 0) {
-                const confirmar = confirm(`Detectamos uma renovação de ${diffMeses} mês(es). Deseja descontar ${diffMeses} crédito(s) e somar R$ ${(diffMeses * 9).toFixed(2)}?`);
+                const valorTotal = diffMeses * VALOR_POR_MES;
+                const confirmar = confirm(`Renovação: ${diffMeses} mês(es).\nDescontar ${diffMeses} crédito(s) e somar R$ ${valorTotal.toFixed(2)} ao financeiro?`);
                 
                 if (confirmar) {
-                    if (typeof deduzirCredito === "function") {
-                        deduzirCredito(diffMeses); // Passa a quantidade de meses detectada
-                    }
-                    if (typeof registrarClienteRenovadoHoje === "function") {
-                        registrarClienteRenovadoHoje(novoNome);
-                    }
-                    mensagensFeedback.push(`Renovado (${diffMeses} meses) ✅`);
+                    if (typeof deduzirCredito === "function") deduzirCredito(diffMeses);
+                    if (typeof adicionarValorAoFinanceiro === "function") adicionarValorAoFinanceiro(valorTotal);
+                    if (typeof registrarClienteRenovadoHoje === "function") registrarClienteRenovadoHoje(novoNome);
+                    
+                    mensagensFeedback.push(`Renovado (${diffMeses}m): -${diffMeses} Créditos | +R$ ${valorTotal.toFixed(2)} ✅`);
                 } else {
-                    mensagensFeedback.push("Data alterada (sem desconto) ✅");
+                    // --- AQUI ESTÁ A CORREÇÃO ---
+                    mostrarToast("Renovação cancelada! Alterações não foram salvas.", "#f44336");
+                    return; // Interrompe a função aqui e não salva nada
                 }
-            } else {
-                mensagensFeedback.push("Data atualizada ✅");
             }
         }
 
-        // 3. Mudança de Nome
+        // 2. Mudanças de Nome e Telefone (só chegam aqui se não cancelou)
         if (nomeAntigo.toLowerCase() !== novoNome) {
             mensagensFeedback.push("Nome alterado ✅");
             if (typeof removerClienteDoFirebase === "function") removerClienteDoFirebase(nomeAntigo);
             if (typeof registrarClienteAlterado === "function") registrarClienteAlterado(novoNome);
         }
 
-        // 4. Mudança de Telefone
-        if (clienteAnterior.telefone !== novoTelefone && nomeAntigo.toLowerCase() === novoNome) {
+        if (clienteAnterior.telefone !== novoTelefone) {
             mensagensFeedback.push("Telefone alterado ✅");
         }
 
-        // Monta o objeto atualizado
+        // Monta e salva o objeto
         const clienteAtualizado = {
             nome: novoNome,
             telefone: novoTelefone,
@@ -1830,15 +1832,13 @@ function salvarEdicaoCliente() {
         clientes[clienteIndex] = clienteAtualizado;
         salvarClientes(clientes);
 
-        // 5. Sincroniza com o Firebase
         atualizarDataNoFirebase(clienteAtualizado)
             .then(() => {
                 if (mensagensFeedback.length > 0) {
                     mostrarToast(mensagensFeedback.join(' | '));
                 } else {
-                    mostrarToast("Alterações salvas! ✅");
+                    mostrarToast("Cliente atualizado! ✅");
                 }
-
                 if (typeof atualizarTabelaOrdenada === "function") atualizarTabelaOrdenada();
                 if (typeof exibirClientesRenovadosHoje === "function") exibirClientesRenovadosHoje();
                 if (typeof fecharModalEditar === "function") fecharModalEditar();
@@ -1846,7 +1846,6 @@ function salvarEdicaoCliente() {
             .catch(err => {
                 console.error("Erro ao sincronizar:", err);
                 mostrarToast("Erro ao sincronizar ❌", "#f44336");
-                setTimeout(() => window.location.reload(), 2000);
             });
     }
 }
