@@ -1576,6 +1576,22 @@ body.dark-mode #modalEditar .modal-conteudo input {
     margin-left: 60px;
 }
 
+body.light-mode .credito-card {
+    background: #000000;
+    backdrop-filter: blur(10px);
+    border: 1px dashed #000000;
+    border-radius: 12px;
+    padding: 8px 16px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+    gap: 5px;
+    margin-left: 60px;
+}
+
 /* Efeito ao passar o mouse */
 .credito-card:hover {
     background: rgba(255, 255, 255, 0.15);
