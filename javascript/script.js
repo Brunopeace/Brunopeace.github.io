@@ -131,7 +131,31 @@ function contarClientesLixeira() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Controle do Loader (Exibe apenas na primeira visita da sessão)
+    // 1. Controle do Tema (Persistência do Modo Claro/Escuro)
+    // Isso garante que o gradiente do seu h1 não "suma" ao atualizar a página
+    const carregarTemaInicial = () => {
+        const savedDarkMode = localStorage.getItem('dark-mode');
+        const userSet = localStorage.getItem('dark-mode-user-set');
+        const body = document.body;
+
+        if (userSet === 'true') {
+            const isDark = savedDarkMode === 'true';
+            // Aplica as classes para que o CSS do h1 funcione corretamente
+            body.classList.toggle('dark-mode', isDark);
+            body.classList.toggle('light-mode', !isDark);
+
+            // Ajusta o footer se ele existir
+            const footer = document.querySelector('footer');
+            if (footer) {
+                footer.classList.toggle('dark-mode-footer', isDark);
+            }
+        }
+    };
+    
+    // Executa a carga do tema antes de esconder o loader para evitar "piscadas" brancas
+    carregarTemaInicial();
+
+    // 2. Controle do Loader (Exibe apenas na primeira visita da sessão)
     const loading = document.getElementById("loading");
     const hasVisited = sessionStorage.getItem("hasVisited");
 
@@ -144,18 +168,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!hasVisited) {
         sessionStorage.setItem("hasVisited", "true");
+        // Tempo de exibição do loader na primeira visita (3 segundos)
         setTimeout(esconderLoader, 3000);
     } else {
         esconderLoader();
     }
 
-    // 2. Chamadas de Inicialização Únicas
-    carregarLixeiraPagina();
-    exibirClientesAlterados();
-    exibirClientesRenovadosHoje();
-    carregarDarkMode();
-    verificarBackupDiario();
-    verificarIdentificador();
+    // 3. Chamadas de Inicialização Únicas
+    if (typeof carregarLixeiraPagina === "function") carregarLixeiraPagina();
+    if (typeof exibirClientesAlterados === "function") exibirClientesAlterados();
+    if (typeof exibirClientesRenovadosHoje === "function") exibirClientesRenovadosHoje();
+    if (typeof carregarDarkMode === "function") carregarDarkMode(); 
+    if (typeof verificarBackupDiario === "function") verificarBackupDiario();
+    if (typeof verificarIdentificador === "function") verificarIdentificador();
+    
+    // --- INTEGRADO: Carregamento de Créditos ---
+    if (typeof carregarCreditos === "function") {
+        carregarCreditos();
+    }
     
     // Inicializa a página e define o intervalo de atualização automática
     if (typeof carregarPagina === "function") {
@@ -163,34 +193,33 @@ document.addEventListener("DOMContentLoaded", () => {
         setInterval(carregarPagina, 30 * 1000); // Atualiza a cada 30 segundos
     }
 
-    // 3. Lógica de Identificação e Botão de Recuperação (Firebase por Telefone)
+    // 4. Lógica de Identificação e Botão de Recuperação (Firebase por Telefone)
     const clientesLocais = typeof carregarClientes === "function" ? carregarClientes() : []; 
     const btnSync = document.getElementById('syncFirebase');
     const idDonoSalvo = localStorage.getItem("id_dono_app");
 
-    // CENÁRIO A: Navegador Limpo (Sem clientes e sem ID de dono)
+    // CENÁRIO A: Navegador Limpo (Sem dados locais)
     if (!clientesLocais || clientesLocais.length === 0) {
         if (btnSync) {
             btnSync.style.display = "block";
             btnSync.innerText = "Restaurar meus clientes (via Telefone) 🔄";
         }
     } 
-    // CENÁRIO B: App em uso, mas sem ID de dono (Configuração inicial)
+    // CENÁRIO B: App em uso, mas sem ID vinculado (Configuração pendente)
     else if (!idDonoSalvo) {
-        // Se há clientes mas não há ID, solicita o telefone para vincular os dados ao Firebase
         setTimeout(() => {
             if (typeof obterIdDono === "function") obterIdDono();
         }, 1000);
         if (btnSync) btnSync.style.display = "none";
     }
-    // CENÁRIO C: Tudo normal
+    // CENÁRIO C: App configurado corretamente
     else {
         if (btnSync) btnSync.style.display = "none";
     }
 
-    // 4. Listeners de Eventos (Inputs, Checkboxes e Scroll)
+    // 5. Listeners de Eventos (Inputs, Checkboxes e Scroll)
     
-    // Selecionar todos os checkboxes da tabela
+    // Selecionar todos os checkboxes da tabela de uma vez
     const selectAll = document.getElementById('select-all');
     if (selectAll) {
         selectAll.addEventListener('change', function() {
@@ -201,18 +230,18 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Input de importação de arquivo JSON
+    // Input para importar arquivo JSON de backup
     const importarInput = document.getElementById("importarClientes");
     if (importarInput) {
         importarInput.addEventListener("change", importarClientes);
     }
 
-    // Ativa a lógica de scroll (ex: botão voltar ao topo)
+    // Ativa lógica de scroll (ex: botões de voltar ao topo)
     if (typeof window.onscroll === "function") {
         window.onscroll();
     }
 
-    // Renderização inicial da lista de clientes
+    // Renderização inicial da lista de clientes na tela
     if (typeof displayClients === "function") {
         displayClients();
     }
@@ -1160,17 +1189,22 @@ function calcularTotalClientesNaoVencidos() {
 }
 
 function toggleDarkMode() {
+    // Alterna a classe dark-mode
     const isDarkMode = document.body.classList.toggle('dark-mode');
+    
+    // Alterna a classe light-mode (se não for dark, é light)
+    document.body.classList.toggle('light-mode', !isDarkMode);
 
     const footer = document.querySelector('footer');
     if (footer) {
         footer.classList.toggle('dark-mode-footer', isDarkMode);
     }
 
-    // Define que o tema foi escolhido manualmente
+    // Salva a preferência
     localStorage.setItem('dark-mode', isDarkMode);
     localStorage.setItem('dark-mode-user-set', 'true');
 }
+
 
 function aplicarDarkMode(isDarkMode) {
     document.body.classList.toggle('dark-mode', isDarkMode);
@@ -2005,5 +2039,3 @@ function editarCreditos() {
         alert("Por favor, insira números válidos.");
     }
 }
-
-document.addEventListener("DOMContentLoaded", carregarCreditos);
