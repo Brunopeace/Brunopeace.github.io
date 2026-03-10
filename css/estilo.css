@@ -25,6 +25,11 @@ h1 {
     background-color: #ffe6e6;
 }
 
+#inputHora {
+    color: #005e0d;
+    font-weight: bold;
+}
+
 .erro-mensagem {
     color: #b81a1a;
     font-size: 13px;
