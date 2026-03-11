@@ -1235,7 +1235,7 @@ function carregarDarkMode() {
 function verificarBackupDiario() {
     // Verificar compatibilidade com localStorage e Blob
     if (typeof Storage === "undefined" || typeof Blob === "undefined") {
-        alert("Seu navegador não suporta os recursos necessários para realizar o backup.");
+        mostrarToast("⚠️ Navegador incompatível com backups!", "#f44336");
         return;
     }
 
@@ -1263,7 +1263,7 @@ function verificarBackupDiario() {
             // Criar um link para download
             const a = document.createElement('a');
             a.href = url;
-            a.download = `backup-${hoje}.json`;
+            a.download = `backup_automatico_${hoje.replace(/\//g, '-')}.json`;
 
             // Simular o clique para download automático
             a.click();
@@ -1274,12 +1274,16 @@ function verificarBackupDiario() {
             // Salvar a data do último backup
             localStorage.setItem('ultimoBackup', hoje);
 
-            // Feedback de sucesso (se desejar)
-            mostrarMensagemSucesso("Backup realizado com sucesso!");
+            // Feedback elegante com seu Toast
+            if (typeof mostrarToast === "function") {
+                mostrarToast("📦 Backup salvo com sucesso! ✅");
+            }
 
         } catch (error) {
             console.error("Erro ao gerar o backup diário:", error);
-            alert("Houve um erro ao gerar o backup diário. Tente novamente.");
+            if (typeof mostrarToast === "function") {
+                mostrarToast("❌ Falha no backup automático.", "#f44336");
+            }
         }
     }
 }
@@ -1941,7 +1945,6 @@ async function entrarComoNovo() {
         alert("Erro ao conectar com o servidor. Tente novamente mais tarde.");
     }
 }
-
 
 function validarSenhaAdm() {
     const senhaDigitada = document.getElementById("inputSenhaAdm").value;
