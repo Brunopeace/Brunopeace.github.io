@@ -132,7 +132,6 @@ function contarClientesLixeira() {
 
 document.addEventListener("DOMContentLoaded", () => {
     // 1. Controle do Tema (Persistência do Modo Claro/Escuro)
-    // Isso garante que o gradiente do seu h1 não "suma" ao atualizar a página
     const carregarTemaInicial = () => {
         const savedDarkMode = localStorage.getItem('dark-mode');
         const userSet = localStorage.getItem('dark-mode-user-set');
@@ -140,11 +139,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (userSet === 'true') {
             const isDark = savedDarkMode === 'true';
-            // Aplica as classes para que o CSS do h1 funcione corretamente
             body.classList.toggle('dark-mode', isDark);
             body.classList.toggle('light-mode', !isDark);
 
-            // Ajusta o footer se ele existir
             const footer = document.querySelector('footer');
             if (footer) {
                 footer.classList.toggle('dark-mode-footer', isDark);
@@ -152,17 +149,25 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
     
-    // Executa a carga do tema antes de esconder o loader para evitar "piscadas" brancas
+    // Inicia o modo claro/escuro imediatamente
     carregarTemaInicial();
 
-    // 2. Controle do Loader (Exibe apenas na primeira visita da sessão)
+    // 2. Controle do Loader e Inicialização do Tema Sazonal
     const loading = document.getElementById("loading");
     const hasVisited = sessionStorage.getItem("hasVisited");
 
     const esconderLoader = () => {
         if (loading) {
             loading.classList.add("hidden");
-            setTimeout(() => (loading.style.display = "none"), 500);
+            setTimeout(() => {
+                loading.style.display = "none";
+                
+                // --- CHAMADA DO TEMA ADICIONADA AQUI ---
+                // Isso garante que o tema (ex: Páscoa) carregue após o loader sair
+                if (typeof ThemeManager !== 'undefined') {
+                    ThemeManager.init();
+                }
+            }, 500);
         }
     };
 
@@ -182,44 +187,37 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeof verificarBackupDiario === "function") verificarBackupDiario();
     if (typeof verificarIdentificador === "function") verificarIdentificador();
     
-    // --- INTEGRADO: Carregamento de Créditos ---
     if (typeof carregarCreditos === "function") {
         carregarCreditos();
     }
     
-    // Inicializa a página e define o intervalo de atualização automática
     if (typeof carregarPagina === "function") {
         carregarPagina();
         setInterval(carregarPagina, 30 * 1000); // Atualiza a cada 30 segundos
     }
 
-    // 4. Lógica de Identificação e Botão de Recuperação (Firebase por Telefone)
+    // 4. Lógica de Identificação e Botão de Recuperação
     const clientesLocais = typeof carregarClientes === "function" ? carregarClientes() : []; 
     const btnSync = document.getElementById('syncFirebase');
     const idDonoSalvo = localStorage.getItem("id_dono_app");
 
-    // CENÁRIO A: Navegador Limpo (Sem dados locais)
     if (!clientesLocais || clientesLocais.length === 0) {
         if (btnSync) {
             btnSync.style.display = "block";
             btnSync.innerText = "Restaurar meus clientes (via Telefone) 🔄";
         }
     } 
-    // CENÁRIO B: App em uso, mas sem ID vinculado (Configuração pendente)
     else if (!idDonoSalvo) {
         setTimeout(() => {
             if (typeof obterIdDono === "function") obterIdDono();
         }, 1000);
         if (btnSync) btnSync.style.display = "none";
     }
-    // CENÁRIO C: App configurado corretamente
     else {
         if (btnSync) btnSync.style.display = "none";
     }
 
     // 5. Listeners de Eventos (Inputs, Checkboxes e Scroll)
-    
-    // Selecionar todos os checkboxes da tabela de uma vez
     const selectAll = document.getElementById('select-all');
     if (selectAll) {
         selectAll.addEventListener('change', function() {
@@ -230,18 +228,17 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Input para importar arquivo JSON de backup
     const importarInput = document.getElementById("importarClientes");
     if (importarInput) {
         importarInput.addEventListener("change", importarClientes);
     }
 
-    // Ativa lógica de scroll (ex: botões de voltar ao topo)
+    // Ativa lógica de scroll
     if (typeof window.onscroll === "function") {
         window.onscroll();
     }
 
-    // Renderização inicial da lista de clientes na tela
+    // Renderização inicial
     if (typeof displayClients === "function") {
         displayClients();
     }
