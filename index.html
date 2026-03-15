@@ -7,6 +7,103 @@
     <title>Gerenciador de clientes</title>
     <link rel="stylesheet" type="text/css" href="css/estilo.css">
     <link rel="manifest" href="manifest.json">
+    
+    <style>
+.trial-overlay {
+  position: fixed;
+  top: 0; 
+  left: 0;
+  width: 100vw; /* Força a largura total da janela */
+  height: 100vh; /* Força a altura total da janela */
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(10px);
+  z-index: 100000; /* Um valor bem alto para garantir que fique sobre tudo */
+  
+  /* Centralização Absoluta */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.trial-card {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  padding: 40px 30px;
+  border-radius: 24px;
+  max-width: 400px; /* Largura máxima controlada */
+  width: 90%; /* Responsivo para celulares */
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+  animation: slideUp 0.5s ease-out;
+  
+  /* Garante que não herde margens externas */
+  margin: auto !important; 
+}
+
+@keyframes slideUp {
+  from { transform: translateY(50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* O RESTANTE DOS SEUS ESTILOS (.trial-icon, h2, p, etc) CONTINUAM IGUAIS */
+
+.trial-icon {
+  font-size: 50px;
+  margin-bottom: 20px;
+}
+
+.trial-card h2 {
+  color: #fff;
+  font-size: 26px;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.trial-divider {
+  height: 3px;
+  width: 50px;
+  background: #25d366;
+  margin: 15px auto 25px;
+  border-radius: 2px;
+}
+
+.trial-card p {
+  color: #b3b3b3;
+  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 15px;
+}
+
+.btn-premium {
+  background: #25d366;
+  color: #fff;
+  border: none;
+  padding: 16px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.trial-id-info {
+  display: block;
+  margin-top: 25px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #555;
+}
+</style>
+
+
 </head>
 
 <!-- Tela de Loader Interativa -->
@@ -20,6 +117,25 @@
 </div>
     
 <body>
+    
+    <!-- tela de bloqueio -->
+<div id="trialOverlay" class="trial-overlay" style="display:none;">
+  <div class="trial-card">
+    <div class="trial-icon">🔒</div>
+    <h2>Acesso Expirado</h2>
+    <div class="trial-divider"></div>
+    <p>Identificamos que sua licença expirou em <b id="displayExpDate">--/--/----</b>.</p>
+    <p class="trial-subtext">Para continuar utilizando o painel de vencimento, realize a renovação com o suporte oficial.</p>
+    
+    <button id="btnWhatsApp" class="btn-premium">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="20" height="20" alt="Zap">
+        Renovar via WhatsApp
+    </button>
+    
+    <span class="trial-id-info">ID do Dispositivo: <span id="deviceIdDisplay"></span></span>
+  </div>
+</div>
+   
     <!--  feedback ao renovar o cliente-->
     <div id="toast-container" class="toast-container"></div>
 
@@ -198,7 +314,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <footer>
-        © 2026 FRONT-END <a href="https://wa.me/5581982258462?text=%2AOl%C3%A1%2C+fiquei+interessado+nesse+seu+aplicativo+web%2C+quanto+custa+%3F%2A"><strong>DEVELOPER</strong></a>
+        © 2026 Front-end <a href="https://wa.me/5581982258462?text=%2AOl%C3%A1%2C+fiquei+interessado+nesse+seu+aplicativo+web%2C+quanto+custa+%3F%2A"><strong>developer</strong></a>
 </footer>
 
 
@@ -249,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { 
         name: 'pascoa', 
         // Páscoa: Março e Abril
-        check: (d, m) => m === 3 || m === 5,
+        check: (d, m) => m === 5 || m === 5,
         action: () => criarPascoa() 
       },
       { 
@@ -588,6 +704,65 @@ function criarSaoJoao() {
     gerarEnfeite();
   }, 400);
 }
+</script>
+
+<!-- tela de bloqueio -->
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const overlay = document.getElementById("trialOverlay");
+    const displayExp = document.getElementById("displayExpDate");
+    const deviceIdDisplay = document.getElementById("deviceIdDisplay");
+
+    // CONFIGURAÇÃO
+    const numeroWhatsApp = "5581982258462"; 
+    const expDate = new Date("2031-04-15T09:16:00"); // Data de Expiração
+    
+    // Gerar um ID aleatório para o dispositivo (para o suporte saber quem é)
+    const deviceId = localStorage.getItem('app_device_id') || 'ID-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+    localStorage.setItem('app_device_id', deviceId);
+    if(deviceIdDisplay) deviceIdDisplay.innerText = deviceId;
+
+    // Formatar data para o texto do modal
+    displayExp.innerText = expDate.toLocaleDateString('pt-BR');
+
+    function verificarExpiracao() {
+        const agora = new Date();
+        
+        if (agora >= expDate) {
+            overlay.style.display = "flex";
+            bloquearInteracoes();
+        }
+    }
+
+    function bloquearInteracoes() {
+        // Impede o scroll da página ao fundo
+        document.body.style.overflow = "hidden";
+        
+        // Impede o uso da tecla ESC e F12 para tentar fechar/inspecionar
+        window.addEventListener('keydown', (e) => {
+            if (e.key === "Escape" || e.key === "F12") {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
+
+    // Checagem inicial
+    verificarExpiracao();
+
+    // Checagem a cada 10 segundos
+    setInterval(verificarExpiracao, 10000);
+
+    // Botão WhatsApp com mensagem profissional
+    document.getElementById("btnWhatsApp").addEventListener("click", () => {
+        const mensagem = `Olá! Meu acesso expirou hoje (${expDate.toLocaleDateString()}). 
+Meu ID é: ${deviceId}. Gostaria de renovar minha licença do Gerenciador.`;
+        
+        const url = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensagem)}`;
+        window.open(url, "_blank");
+    });
+});
 </script>
 
 </body>
