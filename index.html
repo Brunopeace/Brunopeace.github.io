@@ -714,32 +714,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const displayExp = document.getElementById("displayExpDate");
     const deviceIdDisplay = document.getElementById("deviceIdDisplay");
 
-    // CONFIGURAÇÃO
     const numeroWhatsApp = "5581982258462"; 
-    const expDate = new Date("2031-04-15T09:16:00"); // Data de Expiração
+    const expDate = new Date("2031-04-15T09:16:00"); 
     
-    // Gerar um ID aleatório para o dispositivo (para o suporte saber quem é)
     const deviceId = localStorage.getItem('app_device_id') || 'ID-' + Math.random().toString(36).substr(2, 9).toUpperCase();
     localStorage.setItem('app_device_id', deviceId);
     if(deviceIdDisplay) deviceIdDisplay.innerText = deviceId;
-
-    // Formatar data para o texto do modal
-    displayExp.innerText = expDate.toLocaleDateString('pt-BR');
+    if(displayExp) displayExp.innerText = expDate.toLocaleDateString('pt-BR');
 
     function verificarExpiracao() {
         const agora = new Date();
-        
-        if (agora >= expDate) {
-            overlay.style.display = "flex";
-            bloquearInteracoes();
+        if (agora.getTime() >= expDate.getTime()) {
+            if(overlay) {
+                overlay.style.setProperty('display', 'flex', 'important');
+                bloquearInteracoes();
+            }
+        } else {
+            // Isso aqui limpa o bloqueio caso o cache tente mostrar o antigo
+            if(overlay) overlay.style.setProperty('display', 'none', 'important');
+            document.body.style.overflow = "auto";
         }
     }
 
     function bloquearInteracoes() {
-        // Impede o scroll da página ao fundo
         document.body.style.overflow = "hidden";
-        
-        // Impede o uso da tecla ESC e F12 para tentar fechar/inspecionar
         window.addEventListener('keydown', (e) => {
             if (e.key === "Escape" || e.key === "F12") {
                 e.preventDefault();
@@ -748,20 +746,16 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Checagem inicial
     verificarExpiracao();
-
-    // Checagem a cada 10 segundos
     setInterval(verificarExpiracao, 10000);
 
-    // Botão WhatsApp com mensagem profissional
-    document.getElementById("btnWhatsApp").addEventListener("click", () => {
-        const mensagem = `Olá! Meu acesso expirou hoje (${expDate.toLocaleDateString()}). 
-Meu ID é: ${deviceId}. Gostaria de renovar minha licença do Gerenciador.`;
-        
-        const url = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensagem)}`;
-        window.open(url, "_blank");
-    });
+    const btnZap = document.getElementById("btnWhatsApp");
+    if(btnZap) {
+        btnZap.onclick = () => {
+            const mensagem = encodeURIComponent(`Olá! Meu ID: ${deviceId}. Quero renovar meu acesso.`);
+            window.open(`https://wa.me/${numeroWhatsApp}?text=${mensagem}`, "_blank");
+        };
+    }
 });
 </script>
 
