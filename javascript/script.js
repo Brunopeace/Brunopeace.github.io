@@ -53,38 +53,6 @@ setTimeout(() => {
     }
 }, 15000);
 
-    (function() {
-    // Gera um identificador único para o dispositivo se não existir
-    function _0xuuid() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.floor(Math.random() * 16);
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-
-    function _0xcheck() {
-
-        const _0xU = ['31151281541-1411614-410112-1115514-78126419810973','10a3724a-5bce-48e2-9c9f-03f4699c86b3'];
-        
-        let _0xS = localStorage.getItem('uuid');
-
-        if (!_0xS) {
-            _0xS = _0xuuid();
-            localStorage.setItem('uuid', _0xS);
-        }
-
-        const _0xA = _0xU.includes(_0xS);
-
-        if (!_0xA) {
-            console.warn("Acesso negado para UUID:", _0xS);
-            window.location.href = 'acessonegado.html';
-        }
-    }
-
-    _0xcheck();
-})();
-
 window.onscroll = function() {
     const backToTopButton = document.getElementById('backToTop');
     if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
