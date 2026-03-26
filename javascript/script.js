@@ -639,8 +639,9 @@ function gerarIdFirebase(nome) {
         .replace(/[.#$/[\]]/g, ''); // remove caracteres inválidos para o Firebase
 }
 
-function atualizarCorCelulaData(celulaData, data, hora) {
+function atualizarCorCelulaData(celulaData, data, hora, telefone, todosClientes = []) {
     let dv;
+    // 1. Conversão da data para objeto Date (Tratamento de String BR ou Date padrão)
     if (typeof data === 'string' && data.includes('/')) {
         const [dia, mes, ano] = data.split('/');
         dv = new Date(ano, mes - 1, dia);
@@ -648,7 +649,7 @@ function atualizarCorCelulaData(celulaData, data, hora) {
         dv = new Date(data);
     }
 
-    // Configura a hora exata para o cálculo de "Vencido"
+    // 2. Configura a hora exata para o cálculo de precisão
     if (hora && hora.includes(':')) {
         const [h, m] = hora.split(":");
         dv.setHours(parseInt(h), parseInt(m), 0, 0);
@@ -664,17 +665,35 @@ function atualizarCorCelulaData(celulaData, data, hora) {
     dvZerada.setHours(0, 0, 0, 0);
     const diffDias = Math.round((dvZerada - hojeZerado) / (1000 * 60 * 60 * 24));
 
+    // 3. Limpa classes de cores e estilos de borda anteriores para evitar conflitos
     celulaData.classList.remove('red', 'yellow', 'orange');
+    celulaData.style.border = "none";
+    celulaData.style.borderRadius = "0";
 
+    // 4. IMPLEMENTAÇÃO ESPECÍFICA: Borda vermelha para duplicados que vencem em 2 dias
+    if (telefone && todosClientes.length > 0) {
+        // Filtra na lista completa para ver se o telefone se repete
+        const duplicados = todosClientes.filter(c => c.telefone === telefone);
+        
+        // REGRA: Se houver mais de 1 registro com o mesmo número E faltarem exatamente 2 dias
+        if (duplicados.length > 1 && diffDias === 2) {
+            celulaData.style.border = "2px solid #7d0000"; // Aplica a borda vermelha viva
+            celulaData.style.borderRadius = "4px";
+            celulaData.title = "Atenção: Este número está duplicado e vence em 2 dias!";
+        }
+    }
+
+    // 5. Lógica de cores de fundo (Original)
     if (agora > dv) {
+        // Já venceu (passou da hora ou do dia)
         celulaData.classList.add('red');
     } 
-    // Se ainda não passou da hora e é hoje, é Amarelo
     else if (diffDias === 0) {
+        // Vence hoje
         celulaData.classList.add('yellow');
     } 
-    // Se faltam exatamente 2 dias, é Laranja
     else if (diffDias === 2) {
+        // Faltam 2 dias (Aqui a borda vermelha aparecerá se for duplicado)
         celulaData.classList.add('orange');
     }
 }
@@ -683,14 +702,16 @@ function atualizarTabelaOrdenada() {
     const tabela = document.getElementById('corpoTabela');
     if (!tabela) return;
 
+    // 1. Carrega a lista do LocalStorage para ordenação e verificação de duplicados
     let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
     const agora = new Date();
     const hojeZerado = new Date();
     hojeZerado.setHours(0, 0, 0, 0);
 
+    // 2. Define a prioridade visual (Quem aparece primeiro)
     const obterPrioridade = (cliente) => {
         let dv;
-        // Tratamento de data string BR (DD/MM/AAAA)
+        // Tratamento de data no formato string BR (DD/MM/AAAA)
         if (typeof cliente.data === 'string' && cliente.data.includes('/')) {
             const [d, m, a] = cliente.data.split('/');
             dv = new Date(a, m - 1, d);
@@ -698,7 +719,7 @@ function atualizarTabelaOrdenada() {
             dv = new Date(cliente.data);
         }
         
-        // Ajuste exato da hora para saber se "já passou"
+        // Ajuste da hora para precisão do cálculo de vencimento
         if (cliente.hora && cliente.hora.includes(':')) {
             const [h, min] = cliente.hora.split(':');
             dv.setHours(parseInt(h), parseInt(min), 0, 0);
@@ -710,35 +731,44 @@ function atualizarTabelaOrdenada() {
         dvZerada.setHours(0, 0, 0, 0);
         const diffDias = Math.round((dvZerada - hojeZerado) / (1000 * 60 * 60 * 24));
 
-        // --- DEFINIÇÃO DE PESOS ---
-
-        if (agora > dv) return 5;
-
-        if (diffDias === 2) return 1;
-
-        if (diffDias === 0) return 2;
-
-        return 3;
+        // --- DEFINIÇÃO DE PESOS (Ordem de exibição) ---
+        if (agora > dv) return 5;       // Vencidos (vão para o final ou grupo específico)
+        if (diffDias === 2) return 1;   // Faltam 2 dias (Topo da lista - Urgente)
+        if (diffDias === 0) return 2;   // Vence hoje
+        return 3;                       // Outros (Futuros)
     };
 
+    // 3. Executa a ordenação
     clientes.sort((a, b) => {
         const pA = obterPrioridade(a);
         const pB = obterPrioridade(b);
 
+        // Primeiro ordena pelo peso (Prioridade)
         if (pA !== pB) return pA - pB;
 
-        // Desempate por data cronológica para renovados
+        // Segundo critério: Data cronológica (Mais antigos primeiro)
         const dA = new Date(a.data);
         const dB = new Date(b.data);
         if (dA.getTime() !== dB.getTime()) return dA - dB;
         
+        // Terceiro critério: Ordem alfabética
         return a.nome.localeCompare(b.nome);
     });
 
+    // 4. Limpa o corpo da tabela para renderizar a nova ordem
     tabela.innerHTML = "";
+
+    // 5. Renderiza as linhas
+    // Passamos 'clientes' (a lista completa) como o último argumento para que 
+    // a função adicionarLinhaTabela possa verificar duplicidade de telefone.
     clientes.forEach(c => {
-        // Usa a função auxiliar para criar as linhas com as cores certas
-        adicionarLinhaTabela(c.nome, c.telefone, c.data, c.hora || "");
+        adicionarLinhaTabela(
+            c.nome, 
+            c.telefone, 
+            c.data, 
+            c.hora || "", 
+            clientes // <--- LISTA COMPLETA ENVIADA AQUI
+        );
     });
 }
 
@@ -762,10 +792,10 @@ function carregarPagina() {
     }
 }
 
-function adicionarLinhaTabela(nome, telefone, data, hora = "") {
+function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = []) {
     const tabela = document.getElementById('corpoTabela');
     const novaLinha = document.createElement('tr');
-    novaLinha.setAttribute('data-nome', nome.toLowerCase()); // garante minúsculo
+    novaLinha.setAttribute('data-nome', nome.toLowerCase());
 
     const celulaSelecionar = novaLinha.insertCell(0);
     const checkbox = document.createElement('input');
@@ -781,15 +811,18 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
 
     const celulaData = novaLinha.insertCell(3);
     
+    // Tratamento de exibição da data
     if (typeof data === 'string' && data.includes('/')) {
         celulaData.innerText = data;
     } else {
         celulaData.innerText = new Date(data).toLocaleDateString('pt-BR');
     }
 
-    // Atualiza cor da célula com data + hora
-    // Certifique-se que sua função atualizarCorCelulaData também foi atualizada para ler strings
-    atualizarCorCelulaData(celulaData, data, hora);
+    // --- ATUALIZAÇÃO: COR E BORDA DE DUPLICIDADE ---
+    // Passamos o telefone e a listaCompleta para validar se houver duplicata a 2 dias do vencimento
+    if (typeof atualizarCorCelulaData === "function") {
+        atualizarCorCelulaData(celulaData, data, hora, telefone, listaCompleta);
+    }
 
     const celulaHora = novaLinha.insertCell(4);
     celulaHora.innerText = hora || "";
@@ -822,7 +855,7 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
     const conteudoDropdown = document.createElement('div');
     conteudoDropdown.classList.add('dropdown-content');
 
-    // WhatsApp
+    // Botão WhatsApp
     const botaoWhatsApp = document.createElement('button');
     botaoWhatsApp.innerText = 'Enviar para WhatsApp';
     botaoWhatsApp.classList.add('WhatsApp');
@@ -843,6 +876,7 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
         marcarMensagemEnviada(nomeCliente, botaoWhatsApp);
     };
 
+    // Auxiliar: Marcar como enviado
     function marcarMensagemEnviada(nomeCliente, botao) {
         const hojeLocal = new Date().toLocaleDateString('pt-BR');
         let mensagens = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: hojeLocal, nomes: [] };
@@ -863,6 +897,7 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
 
     conteudoDropdown.appendChild(botaoWhatsApp);
 
+    // Auxiliares de Mensagem
     function obterSaudacao() {
         const horaAtual = new Date().getHours();
         if (horaAtual < 12) return "bom dia";
@@ -884,7 +919,7 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
         window.open(url, '_blank');
     }
 
-    // Telegram
+    // Botão Telegram
     const botaoTelegram = document.createElement('button');
     botaoTelegram.innerText = 'Enviar para Telegram';
     botaoTelegram.classList.add('telegram');
@@ -899,7 +934,7 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "") {
         window.open(urlTelegramShare, '_blank');
     };
     
-    // Verifica se o cliente já recebeu mensagem hoje para manter o botão desativado ao carregar
+    // Verifica persistência do botão "Enviado"
     const mensagensEnviadas = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: "", nomes: [] };
     const hojeCheck = new Date().toLocaleDateString('pt-BR');
     if (mensagensEnviadas.data === hojeCheck && mensagensEnviadas.nomes.includes(nome.toLowerCase())) {
