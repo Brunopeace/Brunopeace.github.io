@@ -1963,6 +1963,14 @@ function validarSenhaAdm() {
     }
 }
 
+function fecharModalSenha() {
+    const modal = document.getElementById('modalSenhaAdm');
+    if (modal) {
+        modal.style.display = 'none'; // Esconde o modal
+        document.getElementById('inputSenhaAdm').value = ''; // Limpa o campo de senha por segurança
+    }
+}
+
 // Função única para salvar e buscar (evita duplicar código)
 function prosseguirSincronizacao(telefone) {
     localStorage.setItem("id_dono_app", telefone);
