@@ -103,7 +103,6 @@
 }
 </style>
 
-
 </head>
 
 <!-- Tela de Loader Interativa -->
@@ -160,13 +159,14 @@
 
 <div id="modalIdDono" class="modal-containner">
     <div class="modal-content">
-        <h3>Bem-vindo! 📱</h3>
+        <h3>Bem-vindo!</h3>
         <p>Informe seu número de telefone:</p>
         <input type="tel" id="inputTelefoneDono" placeholder="(00) 00000-0000" maxlength="15">
         
         <div class="modal-actions">
+            <p>Para Usuáris Novos, coloque seu número de telefone e clique aqui 👇.</p>
             <button onclick="entrarComoNovo()" class="btn-novo" style="background: #28a745; color: white;">Usuario Novo</button>
-            
+            <p>Se já for usuário, coloque seu telefone Para recuperar seus clientes.</p>
             <button onclick="confirmarIdDono()" class="btn-confirmar">Restaurar Meus Clientes</button>
         </div>
     </div>
@@ -344,43 +344,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const ThemeManager = {
             // Configurações dos temas
     config: [
-      { 
-        name: 'natal', 
-        // Natal: de 23 a 28 de Dezembro
-        check: (d, m) => m === 12 && (d >= 23 && d <= 28), 
-        action: () => criarNeve() 
-      },
-      { 
-        name: 'ano-novo', 
-        // Ano Novo: de 31 de Dezembro até 05 de Janeiro
-        check: (d, m) => (m === 12 && d >= 31) || (m === 1 && d <= 5), 
-        action: () => criarFogos() 
-      },
-      { 
-        name: 'carnaval', 
-        // Carnaval: Todo o mês de Fevereiro
-        check: (d, m) => m === 2,
-        action: () => criarConfetes() 
-      },
-      { 
-        name: 'pascoa', 
-        // Páscoa: Março e Abril
-        check: (d, m) => m === 3 || m === 5,
-        action: () => criarPascoa() 
-      },
-      { 
-        name: 'sao-joao', 
-        // São João: Todo o mês de Junho
-        check: (d, m) => m === 6,
-        action: () => typeof criarSaoJoao === 'function' ? criarSaoJoao() : null
-      },
-      { 
-        name: 'halloween', 
-        // Halloween: Todo o mês de Outubro
-        check: (d, m) => m === 10,
-        action: () => criarHalloween()
-      }
-    ],
+  { 
+    name: 'natal', 
+    // Natal: 23 a 28 de Dezembro
+    check: (d, m) => m === 12 && (d >= 23 && d <= 28), 
+    action: () => criarNeve() 
+  },
+  { 
+    name: 'ano-novo', 
+    // Ano Novo: 31 de Dezembro até 05 de Janeiro
+    check: (d, m) => (m === 12 && d >= 31) || (m === 1 && d <= 5), 
+    action: () => criarFogos() 
+  },
+  { 
+    name: 'carnaval', 
+    // Carnaval: Fevereiro inteiro
+    check: (d, m) => m === 2,
+    action: () => criarConfetes() 
+  },
+  { 
+    name: 'pascoa', 
+    // Páscoa: Março e Abril (Corrigido para m === 4)
+    check: (d, m) => m === 3 || m === 4,
+    action: () => criarPascoa() 
+  },
+  { 
+    name: 'sao-joao', 
+    // São João: Junho inteiro
+    check: (d, m) => m === 6,
+    action: () => typeof criarSaoJoao === 'function' ? criarSaoJoao() : null
+  },
+  { 
+    name: 'halloween', 
+    // Halloween: Outubro inteiro
+    check: (d, m) => m === 10,
+    action: () => criarHalloween()
+  }
+],
 
     init() {
       const hoje = new Date();
