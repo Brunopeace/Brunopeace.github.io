@@ -2,8 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <link rel="icon" href="img/icon512.png">
-    <title>Painel Master - Gestão de Usuários</title>
+    <title>Painel de usuário Usuários</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     
@@ -133,10 +132,10 @@
 </head>
 <body>
 
-    <h1>🚀 Monitoramento de Usuários Online</h1>
+    <h1>🚀 Gestão de Usuários</h1>
     
     <div id="gridUsuarios" class="grid-usuarios">
-        Conectando ao banco de dados...
+        Buscando usuários...
     </div>
 
     <script>
@@ -187,10 +186,10 @@
                         <div class="info">
                             Telefone/ID: <span class="badge-id">${tel}</span><br>
                             <span class="vencimento-info">
-                                📅 Expira em: ${dataExpira ? dataExpira.split('-').reverse().join('/') : 'Acesso Vitalício'}
+                                Expira em: ${dataExpira ? dataExpira.split('-').reverse().join('/') : 'Acesso Vitalício'}
                             </span>
                             Clientes na Lista: <strong>${totalClientes}</strong><br>
-                            <span class="timestamp">Último sinal: ${dataFormatada}</span>
+                            <span class="timestamp">Último acesso: ${dataFormatada}</span>
                         </div>
                         <div class="admin-actions">
                             <label style="font-size: 0.8rem; color: #888;">Nova data:</label>
