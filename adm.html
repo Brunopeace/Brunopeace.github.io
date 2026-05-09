@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel Master - Gestão de Usuários</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    
+    <style>
+        body {
+            background: #121212;
+            color: white;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+        
+        h1 { 
+            color: #25d366;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        .grid-usuarios {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 10px;
+            scrollbar-width: thin;
+            scrollbar-color: #25d366 #1e1e1e;
+        }
+
+        /* Barra de rolagem customizada */
+        .grid-usuarios::-webkit-scrollbar { width: 8px; }
+        .grid-usuarios::-webkit-scrollbar-track { background: #121212; }
+        .grid-usuarios::-webkit-scrollbar-thumb { background-color: #25d366; border-radius: 10px; }
+
+        .card-user {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            padding: 20px;
+            border-radius: 15px;
+            transition: 0.3s;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .card-user:hover {
+            border-color: #25d366;
+            transform: translateX(5px);
+        }
+        
+        .status-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .status-dot { 
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .online { background: #25d366; box-shadow: 0 0 10px #25d366; }
+        .offline { background: #ff4b4b; }
+        
+        .info { 
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #ccc;
+        }
+        
+        .badge-id {
+            background: #25d366;
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .vencimento-info {
+            color: #ff9800;
+            font-weight: bold;
+            display: block;
+            margin: 5px 0;
+        }
+        
+        .timestamp {
+            color: #888;
+            font-size: 0.8rem;
+        }
+
+        /* Ações administrativas */
+        .admin-actions {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .input-data {
+            background: #121212;
+            border: 1px solid #444;
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .btn-salvar {
+            background: #25d366;
+            border: none;
+            color: black;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .btn-salvar:hover {
+            background: #1da851;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 Monitoramento de Usuários Online</h1>
+    
+    <div id="gridUsuarios" class="grid-usuarios">
+        Conectando ao banco de dados...
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCw38sezt3TWmFIuUXFD3mPAj2ZPF6ZD4o",
+            authDomain: "gerenciador-eeb96.firebaseapp.com",
+            databaseURL: "https://gerenciador-eeb96-default-rtdb.firebaseio.com",
+            projectId: "gerenciador-eeb96",
+            storageBucket: "gerenciador-eeb96.appspot.com",
+            messagingSenderId: "560345055072",
+            appId: "1:560345055072:web:9048475b7ac90a7f43e805"
+        };
+
+        // Inicialização
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        function listarUsuarios() {
+            const grid = document.getElementById('gridUsuarios');
+            
+            db.ref('usuarios').on('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    grid.innerHTML = "Nenhum usuário encontrado no banco.";
+                    return;
+                }
+
+                grid.innerHTML = "";
+                const usuarios = snapshot.val();
+                const agora = Date.now();
+
+                for (let tel in usuarios) {
+                    const user = usuarios[tel];
+                    
+                    const isOnline = user.lastSeen && (agora - user.lastSeen < 45000);
+                    const dataFormatada = user.lastSeen ? new Date(user.lastSeen).toLocaleString('pt-BR') : "Nunca";
+                    const totalClientes = user.clientes ? Object.keys(user.clientes).length : 0;
+                    const dataExpira = user.dataExpiracao || ""; 
+
+                    const card = document.createElement('div');
+                    card.className = 'card-user';
+                    card.innerHTML = `
+                        <div class="status-container">
+                            <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
+                            <strong>${isOnline ? 'USUÁRIO ATIVO' : 'DESCONECTADO'}</strong>
+                        </div>
+                        <div class="info">
+                            Telefone/ID: <span class="badge-id">${tel}</span><br>
+                            <span class="vencimento-info">
+                                📅 Expira em: ${dataExpira ? dataExpira.split('-').reverse().join('/') : 'Acesso Vitalício'}
+                            </span>
+                            Clientes na Lista: <strong>${totalClientes}</strong><br>
+                            <span class="timestamp">Último sinal: ${dataFormatada}</span>
+                        </div>
+                        <div class="admin-actions">
+                            <label style="font-size: 0.8rem; color: #888;">Nova data:</label>
+                            <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
+                            <button class="btn-salvar" onclick="salvarVencimento('${tel}')">Atualizar Licença</button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                }
+            });
+        }
+
+        function salvarVencimento(tel) {
+            const novaData = document.getElementById(`exp-${tel}`).value;
+            
+            if (!novaData) {
+                if(!confirm("Deseja deixar este usuário sem data de vencimento (Acesso Vitalício)?")) return;
+            }
+
+            db.ref('usuarios/' + tel).update({
+                dataExpiracao: novaData
+            }).then(() => {
+                alert("✅ Licença do usuário " + tel + " atualizada com sucesso!");
+            }).catch((error) => {
+                console.error(error);
+                alert("❌ Erro ao atualizar: " + error.message);
+            });
+        }
+
+        listarUsuarios();
+    </script>
+</body>
+</html>
