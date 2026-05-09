@@ -98,8 +98,48 @@ function contarClientesLixeira() {
     return lixeira.length;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    // 1. Controle do Tema (Persistência do Modo Claro/Escuro)
+// ================================================================
+// 1. FUNÇÃO DE SEGURANÇA (VERIFICAÇÃO DE EXISTÊNCIA)
+// ================================================================
+async function verificarExistenciaNoBanco() {
+    const idDono = localStorage.getItem("id_dono_app");
+    
+    if (!idDono || idDono === "padrao") return true;
+
+    try {
+
+        const snapshot = await firebase.database().ref('usuarios/' + idDono).once('value');
+        
+        if (!snapshot.exists()) {
+            console.warn("🚫 Conta não encontrada no servidor. Limpando dados locais...");
+            localStorage.clear(); // Apaga tudo para evitar a "ressurreição" dos dados
+            alert("Sua conta foi excluída pelo administrador.");
+            window.location.reload(); 
+            return false;
+        }
+
+        firebase.database().ref('usuarios/' + idDono).on('value', (snap) => {
+            if (!snap.exists()) {
+                localStorage.clear();
+                window.location.reload();
+            }
+        });
+
+        return true;
+    } catch (error) {
+        console.error("Erro na verificação de segurança:", error);
+        return true;
+    }
+}
+
+// ================================================================
+// 2. INICIALIZAÇÃO DO DOM (COM TRAVA DE SEGURANÇA)
+// ================================================================
+document.addEventListener("DOMContentLoaded", async () => {
+    
+    const acessoPermitido = await verificarExistenciaNoBanco();
+    if (!acessoPermitido) return; 
+
     const carregarTemaInicial = () => {
         const savedDarkMode = localStorage.getItem('dark-mode');
         const userSet = localStorage.getItem('dark-mode-user-set');
@@ -115,9 +155,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 footer.classList.toggle('dark-mode-footer', isDark);
             }
         }
+        
+        if (localStorage.getItem("id_dono_app")) {
+            atualizarStatusOnline();
+        }
+        
+        if (typeof verificarBloqueioMaster === "function") verificarBloqueioMaster();
     };
     
-    // Inicia o modo claro/escuro imediatamente
     carregarTemaInicial();
 
     // 2. Controle do Loader e Inicialização do Tema Sazonal
@@ -129,9 +174,6 @@ document.addEventListener("DOMContentLoaded", () => {
             loading.classList.add("hidden");
             setTimeout(() => {
                 loading.style.display = "none";
-                
-                // --- CHAMADA DO TEMA ADICIONADA AQUI ---
-                // Isso garante que o tema (ex: Páscoa) carregue após o loader sair
                 if (typeof ThemeManager !== 'undefined') {
                     ThemeManager.init();
                 }
@@ -141,7 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!hasVisited) {
         sessionStorage.setItem("hasVisited", "true");
-        // Tempo de exibição do loader na primeira visita (3 segundos)
         setTimeout(esconderLoader, 3000);
     } else {
         esconderLoader();
@@ -161,7 +202,8 @@ document.addEventListener("DOMContentLoaded", () => {
     
     if (typeof carregarPagina === "function") {
         carregarPagina();
-        setInterval(carregarPagina, 30 * 1000); // Atualiza a cada 30 segundos
+        // Atualiza a cada 30 segundos (Isso só vai rodar se o usuário existir)
+        setInterval(carregarPagina, 30 * 1000); 
     }
 
     // 4. Lógica de Identificação e Botão de Recuperação
@@ -201,12 +243,10 @@ document.addEventListener("DOMContentLoaded", () => {
         importarInput.addEventListener("change", importarClientes);
     }
 
-    // Ativa lógica de scroll
     if (typeof window.onscroll === "function") {
         window.onscroll();
     }
 
-    // Renderização inicial
     if (typeof displayClients === "function") {
         displayClients();
     }
@@ -2004,15 +2044,6 @@ function atualizarStatusOnline() {
     });
 }
 
-// Chame a função após verificar que o ID existe
-document.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem("id_dono_app")) {
-        atualizarStatusOnline();
-    }
-    
-    verificarBloqueioMaster();
-});
-
 function verificarBloqueioMaster() {
     const idDono = localStorage.getItem("id_dono_app");
     if (!idDono || idDono === "padrao") return;
@@ -2032,7 +2063,7 @@ function verificarBloqueioMaster() {
             document.body.innerHTML = `
                 <div style="height:100vh; background:#121212; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; font-family:sans-serif; padding:20px;">
                     <h1 style="color:#ff4b4b; font-size: 50px;">🔒 ACESSO BLOQUEADO</h1>
-                    <p style="font-size:1.2rem;">Sua licença de uso deste Gerenciador expirou em <b>${dados.dataExpiracao.split('-').reverse().join('/')}</b>.</p>
+                    <p style="font-size:1.2rem;">Sua licença expirou em <b>${dados.dataExpiracao.split('-').reverse().join('/')}</b>.</p>
                     <p>Entre em contato com o administrador para renovar.</p>
                     <br>
                     <a href="https://wa.me/5581982258462" style="background:#25d366; color:black; padding:15px 30px; border-radius:30px; text-decoration:none; font-weight:bold;">RENOVAR AGORA</a>
