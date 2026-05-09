@@ -1951,7 +1951,7 @@ function confirmarIdDono() {
 
     realizarBuscaNoFirebase(telefone);
 }
-    
+  
 async function entrarComoNovo() {
     const input = document.getElementById("inputTelefoneDono");
     let telefone = input.value.replace(/\D/g, '');
@@ -1964,25 +1964,35 @@ async function entrarComoNovo() {
     const userRef = firebase.database().ref('usuarios/' + telefone);
 
     try {
-        // 2. Consulta o Firebase para ver se o telefone já existe
         const snapshot = await userRef.once('value');
 
         if (snapshot.exists()) {
-            // O usuário já existe! Impedimos o cadastro.
-            alert("⚠️ Já existe um usuário cadastrado com este número. Se você já tem cadastro, clique em restaurar meus clientes.");
-            return; // Para a execução aqui
+            alert("⚠️ Já existe um usuário cadastrado com este número.");
+            return;
         }
 
-        // 3. Se não existe, prossegue com o cadastro
+        // --- MUDANÇA AQUI: Criar o registro no Firebase PRIMEIRO ---
+        await userRef.set({
+            status: "ativo",
+            lastSeen: Date.now(),
+            dataExpiracao: "", // Ou uma data padrão
+            clientes: {}
+        });
+
+        // Agora sim, salva no celular
         localStorage.setItem("id_dono_app", telefone);
         document.getElementById("modalIdDono").style.display = "none";
         
         alert("Bem-vindo! Usuário cadastrado com sucesso.");
-        window.location.reload();
+        
+        // Pequeno delay opcional para garantir que o Firebase processou
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
 
     } catch (error) {
         console.error("Erro ao verificar usuário:", error);
-        alert("Erro ao conectar com o servidor. Tente novamente mais tarde.");
+        alert("Erro ao conectar com o servidor.");
     }
 }
 
