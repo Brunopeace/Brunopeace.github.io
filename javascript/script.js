@@ -1978,6 +1978,71 @@ function prosseguirSincronizacao(telefone) {
     realizarBuscaNoFirebase(telefone);
 }
 
+// Adicione isso ao seu script.js
+function atualizarStatusOnline() {
+    const idDono = obterIdDono();
+    if (idDono === "padrao") return;
+
+    const userRef = firebase.database().ref('usuarios/' + idDono);
+    
+    // Atualiza o "visto por último" agora
+    const reportar = () => {
+        userRef.update({
+            lastSeen: firebase.database.ServerValue.TIMESTAMP,
+            online: true
+        });
+    };
+
+    reportar();
+    // Avisa o servidor a cada 30 segundos que ainda está com a página aberta
+    setInterval(reportar, 30000);
+
+    // Se o usuário fechar a aba, tenta marcar como offline (opcional)
+    userRef.onDisconnect().update({
+        online: false,
+        lastSeen: firebase.database.ServerValue.TIMESTAMP
+    });
+}
+
+// Chame a função após verificar que o ID existe
+document.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem("id_dono_app")) {
+        atualizarStatusOnline();
+    }
+    
+    verificarBloqueioMaster();
+});
+
+function verificarBloqueioMaster() {
+    const idDono = localStorage.getItem("id_dono_app");
+    if (!idDono || idDono === "padrao") return;
+
+    firebase.database().ref('usuarios/' + idDono).on('value', (snapshot) => {
+        const dados = snapshot.val();
+        if (!dados || !dados.dataExpiracao) return;
+
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        
+        // Converte a data do Firebase (AAAA-MM-DD) para objeto Date
+        const dataExp = new Date(dados.dataExpiracao + "T00:00:00");
+
+        if (hoje > dataExp) {
+            // BLOQUEIO TOTAL
+            document.body.innerHTML = `
+                <div style="height:100vh; background:#121212; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; font-family:sans-serif; padding:20px;">
+                    <h1 style="color:#ff4b4b; font-size: 50px;">🔒 ACESSO BLOQUEADO</h1>
+                    <p style="font-size:1.2rem;">Sua licença de uso deste Gerenciador expirou em <b>${dados.dataExpiracao.split('-').reverse().join('/')}</b>.</p>
+                    <p>Entre em contato com o administrador para renovar.</p>
+                    <br>
+                    <a href="https://wa.me/5581982258462" style="background:#25d366; color:black; padding:15px 30px; border-radius:30px; text-decoration:none; font-weight:bold;">RENOVAR AGORA</a>
+                </div>
+            `;
+            document.body.style.overflow = "hidden";
+        }
+    });
+}
+
 const VALOR_POR_MES = 9.00;
 
 function atualizarDisplayCreditos(quantidade, valorTotal) {
