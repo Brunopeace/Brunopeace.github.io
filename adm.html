@@ -52,42 +52,53 @@
         const db = firebase.database();
 
         function listarUsuarios() {
-            const grid = document.getElementById('gridUsuarios');
-            db.ref('usuarios').on('value', (snapshot) => {
-                if (!snapshot.exists()) {
-                    grid.innerHTML = "Nenhum usuário encontrado.";
-                    return;
-                }
-                grid.innerHTML = "";
-                const usuarios = snapshot.val();
-                const agora = Date.now();
-
-                for (let tel in usuarios) {
-                    const user = usuarios[tel];
-                    const isOnline = user.lastSeen && (agora - user.lastSeen < 45000);
-                    const dataExpira = user.dataExpiracao || ""; 
-
-                    const card = document.createElement('div');
-                    card.className = 'card-user';
-                    card.innerHTML = `
-                        <div class="status-container">
-                            <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
-                            <strong>${isOnline ? 'USUÁRIO ATIVO' : 'DESCONECTADO'}</strong>
-                        </div>
-                        <div class="info">
-                            ID: <span class="badge-id">${tel}</span> | 
-                            Expira: ${dataExpira || 'Vitalício'}
-                        </div>
-                        <div class="admin-actions">
-                            <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
-                            <button class="btn-salvar" onclick="salvarVencimento('${tel}')">Atualizar</button>
-                            <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Excluir Tudo</button>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-                }
-            });
+    const grid = document.getElementById('gridUsuarios');
+    db.ref('usuarios').on('value', (snapshot) => {
+        if (!snapshot.exists()) {
+            grid.innerHTML = "Nenhum usuário encontrado.";
+            return;
         }
+        grid.innerHTML = "";
+        const usuarios = snapshot.val();
+        const agora = Date.now();
+
+        for (let tel in usuarios) {
+            const user = usuarios[tel];
+            
+            // Lógica de Online/Offline (45 segundos)
+            const isOnline = user.lastSeen && (agora - user.lastSeen < 45000);
+            
+            // Formatação do Último Acesso
+            const dataUltimoAcesso = user.lastSeen 
+                ? new Date(user.lastSeen).toLocaleString('pt-BR') 
+                : "Nunca";
+                
+            const dataExpira = user.dataExpiracao || ""; 
+
+            const card = document.createElement('div');
+            card.className = 'card-user';
+            card.innerHTML = `
+                <div class="status-container">
+                    <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
+                    <strong>${isOnline ? 'USUÁRIO ATIVO' : 'DESCONECTADO'}</strong>
+                </div>
+                <div class="info">
+                    ID: <span class="badge-id">${tel}</span> | 
+                    Expira: <strong>${dataExpira || 'Vitalício'}</strong><br>
+                    <span style="color: #888; font-size: 0.8rem;">
+                        Último acesso: ${dataUltimoAcesso}
+                    </span>
+                </div>
+                <div class="admin-actions">
+                    <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
+                    <button class="btn-salvar" onclick="salvarVencimento('${tel}')">Atualizar</button>
+                    <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Excluir Usuário</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        }
+    });
+}
 
         function salvarVencimento(tel) {
             const novaData = document.getElementById(`exp-${tel}`).value;
