@@ -275,6 +275,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+
 function removerPermanentemente(nome) {
     const lixeira = carregarLixeira();
     const clienteIndex = lixeira.findIndex(c => c.nome.toLowerCase() === nome.toLowerCase());
@@ -1520,28 +1521,59 @@ async function realizarBuscaNoFirebase(idDono) {
 
     try {
         btn.disabled = true;
-        btn.innerText = "Buscando dados...";
+        btn.innerText = "Verificando conta...";
         
-        // 1. Busca no Firebase
-        const snapshot = await firebase.database().ref('usuarios/' + idDono + '/clientes').once('value');
-        const dadosFirebase = snapshot.val();
+        // 1. Busca os dados COMPLETOS do usuário (para pegar senha e pix)
+        const snapshot = await firebase.database().ref('usuarios/' + idDono).once('value');
+        const usuarioFull = snapshot.val();
 
-        // 2. Validação: Se não encontrou, avisa e para. 
-        // O MODAL CONTINUA ABERTO AQUI.
-        if (!dadosFirebase) {
+        // 2. Validação: Se não encontrou o usuário no banco
+        if (!usuarioFull) {
             alert("Nenhum backup encontrado para este número.");
             btn.innerText = textoOriginal;
             btn.disabled = false;
             return; 
         }
 
-        // 3. Processamento dos dados
-        const novosClientes = [];
+        // --- BLOCO DE SEGURANÇA: VALIDAÇÃO DE SENHA ---
+        const senhaSalva = usuarioFull.senhaSeguranca;
         
+        // Se o usuário tiver uma senha cadastrada no banco, solicitamos ela
+        if (senhaSalva) {
+            const senhaDigitada = prompt("🔒 Conta Protegida!\n\nDigite sua SENHA DE SEGURANÇA para restaurar seus clientes:");
+
+            if (senhaDigitada === null) { // Usuário clicou em cancelar
+                btn.innerText = textoOriginal;
+                btn.disabled = false;
+                return;
+            }
+
+            if (senhaDigitada !== senhaSalva) {
+                alert("❌ Senha incorreta! Acesso negado.");
+                btn.innerText = textoOriginal;
+                btn.disabled = false;
+                return;
+            }
+        }
+        // ----------------------------------------------
+
+        btn.innerText = "Restaurando clientes...";
+        const dadosFirebase = usuarioFull.clientes;
+
+        // Caso o usuário exista mas a lista de clientes esteja vazia
+        if (!dadosFirebase) {
+            alert("Você possui um cadastro, mas sua lista de clientes está vazia.");
+            localStorage.setItem("id_dono_app", idDono);
+            if (usuarioFull.chavePix) localStorage.setItem("meu_pix", usuarioFull.chavePix);
+            window.location.reload();
+            return;
+        }
+
+        // 3. Processamento dos dados (Conversão de datas)
+        const novosClientes = [];
         Object.keys(dadosFirebase).forEach(nomeChave => {
             const clienteFb = dadosFirebase[nomeChave];
             let dataFinal;
-            
             const dataRaw = clienteFb.vencimento || clienteFb.data;
 
             if (dataRaw && typeof dataRaw === 'string') {
@@ -1569,22 +1601,26 @@ async function realizarBuscaNoFirebase(idDono) {
             });
         });
 
-        // 4. SUCESSO: Agora sim, salvamos e fechamos
+        // 4. SUCESSO: Salvamos o ID, o PIX e os Clientes no LocalStorage
         localStorage.setItem("id_dono_app", idDono);
+        
+        // Restaura o Pix dele automaticamente
+        if (usuarioFull.chavePix) {
+            localStorage.setItem("meu_pix", usuarioFull.chavePix);
+        }
+        
         salvarClientes(novosClientes);
         
-        alert(`Sucesso! ${novosClientes.length} clientes restaurados.`);
+        alert(`✅ Sucesso! ${novosClientes.length} clientes restaurados.`);
         
-        // Agora fechamos o modal e recarregamos
         const modal = document.getElementById("modalIdDono");
         if (modal) modal.style.display = "none";
         
         window.location.reload();
 
     } catch (error) {
-        // Se der erro de rede, o modal também permanece aberto
         console.error("Erro na sincronização:", error);
-        alert("Erro ao conectar com o banco de dados.");
+        alert("Erro ao conectar com o banco de dados. Verifique sua conexão.");
         btn.innerText = textoOriginal;
         btn.disabled = false;
     }
@@ -1942,7 +1978,6 @@ function mostrarToast(mensagem) {
 
     const toast = document.createElement('div');
     toast.className = 'toast-card';
-    // Removi a linha toast.style.backgroundColor para usar a do CSS
     toast.innerHTML = `<span>${mensagem}</span>`;
     
     container.appendChild(toast);
@@ -1953,12 +1988,10 @@ function mostrarToast(mensagem) {
     }, 3000);
 }
 
-// 1. Função que apenas retorna o ID se ele já existir
 function obterIdDono() {
     return localStorage.getItem("id_dono_app") || "padrao";
 }
 
-// 2. Função que verifica se precisa abrir o modal ao carregar o app
 function verificarIdentificador() {
     const idExistente = localStorage.getItem("id_dono_app");
     
@@ -1972,23 +2005,37 @@ const SENHA_MASTER = "9436631200";
 
 function confirmarIdDono() {
     const input = document.getElementById("inputTelefoneDono");
+    
     let telefone = input.value.replace(/\D/g, ''); 
+    
     const TELEFONE_MASTER = "81982258462";
 
     if (telefone.length < 8) {
-        alert("Por favor, digite um número de telefone válido com DDD.");
+        alert("⚠️ Por favor, digite um número de telefone válido com DDD (apenas números).");
         return;
     }
 
-    // Se for o master, abre o modal de senha (o outro modal)
     if (telefone === TELEFONE_MASTER) {
-        document.getElementById("modalSenhaAdm").style.display = "flex"; 
+        console.log("👑 Acesso Master detectado. Solicitando senha de administrador...");
+        const modalAdm = document.getElementById("modalSenhaAdm");
+        if (modalAdm) {
+            modalAdm.style.display = "flex";
+        } else {
+            alert("Erro: Modal de administração não encontrado no HTML.");
+        }
         return; 
     }
 
-    realizarBuscaNoFirebase(telefone);
+    console.log("🔍 Iniciando busca de backup para o ID: " + telefone);
+    
+    if (typeof realizarBuscaNoFirebase === "function") {
+        realizarBuscaNoFirebase(telefone);
+    } else {
+        console.error("Erro: A função realizarBuscaNoFirebase não foi carregada corretamente.");
+        alert("Ocorreu um erro técnico. Por favor, recarregue a página.");
+    }
 }
-  
+
 async function entrarComoNovo() {
     const input = document.getElementById("inputTelefoneDono");
     let telefone = input.value.replace(/\D/g, '');
@@ -2004,46 +2051,59 @@ async function entrarComoNovo() {
         const snapshot = await userRef.once('value');
 
         if (snapshot.exists()) {
-            alert("⚠️ Já existe um usuário cadastrado com este número.");
+            alert("⚠️ Já existe um usuário cadastrado com este número. Se você já tem cadastro, use a opção de restaurar.");
             return;
         }
 
-        // --- BLOCO DE OBRIGATORIEDADE DO PIX ---
         let pixInserido = "";
-        let preencheuCorretamente = false;
-
-        while (!preencheuCorretamente) {
-            pixInserido = prompt("🚀 BEM-VINDO!\n\nPara continuar, é OBRIGATÓRIO inserir sua chave PIX.\nEla será enviada automaticamente nas suas mensagens de cobrança para seus clientes.");
+        while (true) {
+            pixInserido = prompt("🚀 BEM-VINDO!\n\nInsira sua chave PIX.\nEla será enviada junto com a mensagem personalizada para seus clientes.");
 
             if (pixInserido === null) {
-                // Se ele clicar em "Cancelar", avisamos que não pode seguir
-                alert("O cadastro não pode ser finalizado sem uma chave PIX.");
-                return; // Encerra a função sem cadastrar nada
+                alert("Cadastro cancelado. O PIX é obrigatório.");
+                return;
             }
 
-            if (pixInserido.trim() === "") {
-                alert("⚠️ Erro: A chave PIX não pode estar em branco.");
-            } else {
-                preencheuCorretamente = true; // Sai do laço
+            if (pixInserido.trim() !== "") {
+                pixInserido = pixInserido.trim();
+                break;
             }
+            alert("⚠️ Erro: A chave PIX não pode estar em branco.");
         }
 
-        // Criar o registro no Firebase (Só chega aqui se o Pix for preenchido)
+        let senhaSeguranca = "";
+        while (true) {
+            senhaSeguranca = prompt("🔐 CRIE UMA SENHA DE SEGURANÇA:\n\nDigite uma senha (mínimo 4 dígitos) para proteger seus dados e permitir restaurações futuras.");
+
+            if (senhaSeguranca === null) {
+                alert("Cadastro cancelado. A senha é obrigatória.");
+                return;
+            }
+
+            if (senhaSeguranca.trim().length >= 4) {
+                senhaSeguranca = senhaSeguranca.trim();
+                break;
+            }
+            alert("⚠️ Erro: A senha deve ter no mínimo 4 dígitos.");
+        }
+
+        // --- 3. CRIAÇÃO DO REGISTRO NO FIREBASE ---
         await userRef.set({
             status: "ativo",
             lastSeen: Date.now(),
             dataExpiracao: "", 
-            chavePix: pixInserido.trim(),
+            chavePix: pixInserido,
+            senhaSeguranca: senhaSeguranca, // Senha salva para conferência na restauração
             clientes: {}
         });
 
-        // Salva as informações no LocalStorage
+        // --- 4. PERSISTÊNCIA LOCAL ---
         localStorage.setItem("id_dono_app", telefone);
-        localStorage.setItem("meu_pix", pixInserido.trim());
+        localStorage.setItem("meu_pix", pixInserido);
         
         document.getElementById("modalIdDono").style.display = "none";
         
-        alert("✅ Cadastro realizado com sucesso! Suas cobranças já estão configuradas com o seu PIX.");
+        alert("✅ Cadastro realizado com sucesso!\n\nSuas mensagens já estão configuradas com seu PIX e seus dados estão protegidos por senha.");
         
         setTimeout(() => {
             window.location.reload();
@@ -2051,9 +2111,10 @@ async function entrarComoNovo() {
 
     } catch (error) {
         console.error("Erro ao cadastrar:", error);
-        alert("Erro ao conectar com o servidor.");
+        alert("Erro ao conectar com o servidor. Verifique sua conexão.");
     }
 }
+
 
 function validarSenhaAdm() {
     const senhaDigitada = document.getElementById("inputSenhaAdm").value;
