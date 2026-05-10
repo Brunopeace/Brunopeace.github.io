@@ -132,14 +132,37 @@ async function verificarExistenciaNoBanco() {
     }
 }
 
+// Função para o usuário trocar o Pix manualmente
+function configurarMeuPix() {
+    const pixAtual = localStorage.getItem("meu_pix") || "brunopeaceandlove60@gmail.com";
+    const novoPix = prompt("Digite sua chave PIX para cobranças:", pixAtual);
+    
+    if (novoPix !== null && novoPix.trim() !== "") {
+        const pixLimpo = novoPix.trim();
+        localStorage.setItem("meu_pix", pixLimpo);
+        
+        const idDono = localStorage.getItem("id_dono_app");
+        if (idDono && idDono !== "padrao") {
+            firebase.database().ref('usuarios/' + idDono).update({
+                chavePix: pixLimpo
+            });
+        }
+        alert("✅ Chave PIX atualizada!");
+        if (typeof carregarPagina === "function") carregarPagina();
+    }
+}
+
 // ================================================================
-// 2. INICIALIZAÇÃO DO DOM (COM TRAVA DE SEGURANÇA)
+// 2. INICIALIZAÇÃO DO DOM
 // ================================================================
+
 document.addEventListener("DOMContentLoaded", async () => {
     
+    // --- TRAVA DE SEGURANÇA E CARREGAMENTO DE DADOS DO USUÁRIO ---
     const acessoPermitido = await verificarExistenciaNoBanco();
     if (!acessoPermitido) return; 
 
+    // 1. Controle do Tema (Persistência do Modo Claro/Escuro)
     const carregarTemaInicial = () => {
         const savedDarkMode = localStorage.getItem('dark-mode');
         const userSet = localStorage.getItem('dark-mode-user-set');
@@ -202,7 +225,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     if (typeof carregarPagina === "function") {
         carregarPagina();
-        // Atualiza a cada 30 segundos (Isso só vai rodar se o usuário existir)
+        // Atualiza a cada 30 segundos
         setInterval(carregarPagina, 30 * 1000); 
     }
 
@@ -946,33 +969,47 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
     }
 
     function criarMensagemWhatsApp(saudacao, dataVencimento) {
-        return encodeURIComponent(
-            `*Olá, ${saudacao}!* \n\n` +
-            `Seu plano de canais está vencendo em *${dataVencimento}*.\n` +
-            `Caso queira renovar após esta data, favor entrar em contato.\n\n` +
-            `*PIX EMAIL:* \n\n brunopeaceandlove60@gmail.com`
-        );
-    }
+    const pixDoUsuario = localStorage.getItem("meu_pix") || "brunopeaceandlove60@gmail.com";
+
+    return encodeURIComponent(
+        `*Olá, ${saudacao}!* \n\n` +
+        `Seu plano de canais está vencendo em *${dataVencimento}*.\n` +
+        `Caso queira renovar após esta data, favor entrar em contato.\n\n` +
+        `*CHAVE PIX:* \n\n ${pixDoUsuario}`
+    );
+}
 
     function abrirWhatsApp(telefone, mensagem) {
         const url = `https://api.whatsapp.com/send?phone=55${telefone}&text=${mensagem}`;
         window.open(url, '_blank');
     }
 
-    // Botão Telegram
+        // Botão Telegram
     const botaoTelegram = document.createElement('button');
     botaoTelegram.innerText = 'Enviar para Telegram';
     botaoTelegram.classList.add('telegram');
+    
     botaoTelegram.onclick = function () {
         const dataVencimentoDestacada = celulaData.innerText;
         const saudacao = obterSaudacao();
+        
+        // Busca o Pix do usuário logado ou usa o padrão
+        const pixDoUsuario = localStorage.getItem("meu_pix") || "brunopeaceandlove60@gmail.com";
+
         const mensagem = encodeURIComponent(
-            `Olá ${saudacao}, seu plano de canais está vencendo, com data de vencimento dia ${dataVencimentoDestacada}. Caso queira renovar após esta data, favor entrar em contato. \n\n PIX EMAIL \n\n brunopeaceandlove60@gmail.com`
+            `Olá ${saudacao}, seu plano de canais está vencendo, com data de vencimento dia ${dataVencimentoDestacada}. ` +
+            `Caso queira renovar após esta data, favor entrar em contato. \n\n` +
+            `*CHAVE PIX:* \n\n ${pixDoUsuario}`
         );
+
         const numeroTelefone = telefone.replace(/\D/g, '');
-        const urlTelegramShare = `https://t.me/share/url?url=tel:+${numeroTelefone}&text=${mensagem}`;
+        
+        // O Telegram usa um formato de link um pouco diferente para compartilhar texto
+        const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(' ') }&text=${mensagem}`;
+        
         window.open(urlTelegramShare, '_blank');
     };
+
     
     // Verifica persistência do botão "Enviado"
     const mensagensEnviadas = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: "", nomes: [] };
@@ -1971,27 +2008,49 @@ async function entrarComoNovo() {
             return;
         }
 
-        // --- MUDANÇA AQUI: Criar o registro no Firebase PRIMEIRO ---
+        // --- BLOCO DE OBRIGATORIEDADE DO PIX ---
+        let pixInserido = "";
+        let preencheuCorretamente = false;
+
+        while (!preencheuCorretamente) {
+            pixInserido = prompt("🚀 BEM-VINDO!\n\nPara continuar, é OBRIGATÓRIO inserir sua chave PIX.\nEla será enviada automaticamente nas suas mensagens de cobrança para seus clientes.");
+
+            if (pixInserido === null) {
+                // Se ele clicar em "Cancelar", avisamos que não pode seguir
+                alert("O cadastro não pode ser finalizado sem uma chave PIX.");
+                return; // Encerra a função sem cadastrar nada
+            }
+
+            if (pixInserido.trim() === "") {
+                alert("⚠️ Erro: A chave PIX não pode estar em branco.");
+            } else {
+                preencheuCorretamente = true; // Sai do laço
+            }
+        }
+
+        // Criar o registro no Firebase (Só chega aqui se o Pix for preenchido)
         await userRef.set({
             status: "ativo",
             lastSeen: Date.now(),
-            dataExpiracao: "", // Ou uma data padrão
+            dataExpiracao: "", 
+            chavePix: pixInserido.trim(),
             clientes: {}
         });
 
-        // Agora sim, salva no celular
+        // Salva as informações no LocalStorage
         localStorage.setItem("id_dono_app", telefone);
+        localStorage.setItem("meu_pix", pixInserido.trim());
+        
         document.getElementById("modalIdDono").style.display = "none";
         
-        alert("Bem-vindo! Usuário cadastrado com sucesso.");
+        alert("✅ Cadastro realizado com sucesso! Suas cobranças já estão configuradas com o seu PIX.");
         
-        // Pequeno delay opcional para garantir que o Firebase processou
         setTimeout(() => {
             window.location.reload();
         }, 500);
 
     } catch (error) {
-        console.error("Erro ao verificar usuário:", error);
+        console.error("Erro ao cadastrar:", error);
         alert("Erro ao conectar com o servidor.");
     }
 }
