@@ -104,30 +104,47 @@ function contarClientesLixeira() {
 async function verificarExistenciaNoBanco() {
     const idDono = localStorage.getItem("id_dono_app");
     
+    // Se não há ID ou é o padrão, permite carregar a tela inicial/login
     if (!idDono || idDono === "padrao") return true;
 
     try {
-
+        // 1. Verificação imediata ao abrir o App
         const snapshot = await firebase.database().ref('usuarios/' + idDono).once('value');
         
         if (!snapshot.exists()) {
             console.warn("🚫 Conta não encontrada no servidor. Limpando dados locais...");
-            localStorage.clear(); // Apaga tudo para evitar a "ressurreição" dos dados
-            alert("Sua conta foi excluída pelo administrador.");
+            
+            // Limpa TUDO para o app não tentar fazer backup e recriar o nó no Firebase
+            localStorage.clear(); 
+            sessionStorage.clear(); 
+            
+            alert("⚠️ Sua conta foi excluída ou desativada pelo administrador.");
             window.location.reload(); 
             return false;
         }
 
         firebase.database().ref('usuarios/' + idDono).on('value', (snap) => {
             if (!snap.exists()) {
+                console.warn("🚫 Conta excluída em tempo real.");
                 localStorage.clear();
+                sessionStorage.clear();
                 window.location.reload();
             }
         });
 
+        // 3. Verificação de Status (Opcional: Se quiser bloquear sem excluir)
+        const dados = snapshot.val();
+        if (dados && dados.status === "bloqueado") {
+            alert("⚠️ Seu acesso está temporariamente suspenso.");
+            localStorage.clear();
+            window.location.reload();
+            return false;
+        }
+
         return true;
     } catch (error) {
         console.error("Erro na verificação de segurança:", error);
+        // Em caso de erro de conexão, permite o uso offline para não frustrar o usuário
         return true;
     }
 }
@@ -274,7 +291,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         displayClients();
     }
 });
-
 
 function removerPermanentemente(nome) {
     const lixeira = carregarLixeira();
@@ -1011,7 +1027,6 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
         window.open(urlTelegramShare, '_blank');
     };
 
-    
     // Verifica persistência do botão "Enviado"
     const mensagensEnviadas = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: "", nomes: [] };
     const hojeCheck = new Date().toLocaleDateString('pt-BR');
@@ -1750,13 +1765,10 @@ async function registrarToken() {
             return;
         }
 
-        // ⚠️ REGISTRA O SW NA RAIZ (Essencial para GitHub Pages e para o Push funcionar)
-        // Removi a pasta /firebase-messaging/ pois o SW deve estar na raiz para ter escopo total
         const swFirebase = await navigator.serviceWorker.register("firebase-messaging-sw.js");
 
         console.log("✔ SW Firebase Messaging carregado:", swFirebase);
 
-        // GERA O TOKEN USANDO O REGISTRO DO SW ACIMA
         const token = await messaging.getToken({
             vapidKey: "BLjysHYuYMCgWcARiaeByArVexcnPcBD5q57wcmqDuLx9fNgJAPfksen9mCE8Df7I_KCPhOPxD57SH6IHWof6qc",
             serviceWorkerRegistration: swFirebase
@@ -1772,8 +1784,6 @@ async function registrarToken() {
         // 1. Salva o token no seu banco de dados (na pasta do usuário)
         salvarTokenNoRealtime(token);
 
-        // 2. EXECUTA A VERIFICAÇÃO DE VENCIMENTOS (Nova alteração)
-        // Assim que o app abre e registra o token, ele já avisa se alguém vence em 2 dias
         if (typeof verificarVencimentosENotificar === "function") {
             verificarVencimentosENotificar();
         }
@@ -2204,7 +2214,11 @@ function verificarBloqueioMaster() {
     });
 }
 
-const VALOR_POR_MES = 9.00;
+// Substitua a sua constante fixa por uma função que busca o valor atualizado
+function obterPrecoMensal() {
+    const valorSalvo = localStorage.getItem("valor_mensalidade_personalizado");
+    return valorSalvo ? parseFloat(valorSalvo) : 9.00; // 9.00 é o padrão (default)
+}
 
 function atualizarDisplayCreditos(quantidade, valorTotal) {
     const displayQuantidade = document.getElementById("displayQuantidade");
@@ -2237,60 +2251,100 @@ function carregarCreditos() {
 }
 
 function deduzirCredito(meses = 1) {
-    // 1. Recupera os valores atuais do LocalStorage ou define padrões
+    // 1. Recupera o preço por mês personalizado (ou usa 9.00 como padrão)
+    const PRECO_CONFIGURADO = parseFloat(localStorage.getItem("valor_mensalidade_personalizado")) || 9.00;
+
+    // 2. Recupera o saldo de créditos e o valor total acumulado
     let creditos = parseInt(localStorage.getItem("meus_creditos")) || 0;
     let valorAcumulado = parseFloat(localStorage.getItem("valor_acumulado")) || 0.00;
     
-    // 2. Cálculos baseados no multiplicador de meses
+    // 3. Cálculos baseados no multiplicador de meses e no preço dinâmico
     const totalDesconto = meses;
-    const totalGanho = meses * VALOR_POR_MES;
+    const totalGanho = meses * PRECO_CONFIGURADO;
 
-    // 3. Verificação de saldo de créditos
+    // 4. Verificação de saldo de créditos
     if (creditos >= totalDesconto) {
-        // Aplica a dedução e a soma financeira
+        // Aplica a dedução dos créditos e soma o lucro financeiro
         creditos -= totalDesconto;
         valorAcumulado += totalGanho;
         
-        // 4. Salva os novos valores no LocalStorage para evitar perda ao atualizar
+        // 5. Salva os novos valores no LocalStorage
         localStorage.setItem("meus_creditos", creditos);
         localStorage.setItem("valor_acumulado", valorAcumulado.toFixed(2));
         
-        // 5. Atualiza a interface visual
+        // 6. Atualiza a interface visual (Displays do card de créditos)
         if (typeof atualizarDisplayCreditos === "function") {
             atualizarDisplayCreditos(creditos, valorAcumulado);
         }
         
-        // Feedback para o usuário
+        // Feedback personalizado para o usuário
         const msg = meses > 1 
-            ? `Renovação de ${meses} meses: -${totalDesconto} créditos e +R$ ${totalGanho.toFixed(2)}` 
-            : `Cliente renovado! +R$ ${VALOR_POR_MES.toFixed(2)}`;
+            ? `✅ Renovação de ${meses} meses: -${totalDesconto} créditos e +R$ ${totalGanho.toFixed(2)}` 
+            : `✅ Cliente renovado! +R$ ${PRECO_CONFIGURADO.toFixed(2)}`;
             
         mostrarToast(msg, "success");
     } else {
-        // Caso não haja saldo suficiente
-        mostrarToast(`Saldo insuficiente! Você precisa de ${totalDesconto} créditos.`, "error");
+        // Caso o revendedor esteja sem saldo de créditos
+        mostrarToast(`❌ Saldo insuficiente! Você precisa de ${totalDesconto} créditos.`, "error");
     }
 }
 
 function editarCreditos() {
+    // 1. Recupera os valores atuais ou define padrões
     const credAtuais = localStorage.getItem("meus_creditos") || 1500;
-    const valorAtual = localStorage.getItem("valor_acumulado") || 0.00;
+    const valorAcumuladoAtual = localStorage.getItem("valor_acumulado") || "0.00";
+    const precoUnitarioAtual = localStorage.getItem("valor_mensalidade_personalizado") || "9.00";
 
-    const novoCredito = prompt("Digite a nova quantidade de créditos:", credAtuais);
+    // 2. Pergunta a nova quantidade de créditos
+    const novoCredito = prompt("💎 QUANTIDADE DE CRÉDITOS:\nDigite o saldo de créditos atual:", credAtuais);
     if (novoCredito === null) return;
 
-    const novoValor = prompt("Digite o novo valor total em R$ (use ponto para centavos):", valorAtual);
-    if (novoValor === null) return;
+    // 3. Pergunta o novo valor acumulado em R$
+    const novoValorAcumulado = prompt("💰 VALOR ACUMULADO (R$):\nDigite o total já ganho (ex: 150.00):", valorAcumuladoAtual);
+    if (novoValorAcumulado === null) return;
+
+    // 4. Pergunta o preço que ele cobra por cada mês (O valor unitário)
+    const novoPrecoUnitario = prompt("🏷️ VALOR DA MENSALIDADE (R$):\nQuanto você cobra por mês de cada cliente?", precoUnitarioAtual);
+    if (novoPrecoUnitario === null) return;
+
+    // Limpeza de vírgulas por pontos
+    const valorLimpo = novoValorAcumulado.replace(',', '.');
+    const precoLimpo = novoPrecoUnitario.replace(',', '.');
+
+    // 5. Validação e Salvamento
+    if (!isNaN(novoCredito) && !isNaN(valorLimpo) && !isNaN(precoLimpo)) {
+        localStorage.setItem("meus_creditos", parseInt(novoCredito));
+        localStorage.setItem("valor_acumulado", parseFloat(valorLimpo).toFixed(2));
+        localStorage.setItem("valor_mensalidade_personalizado", parseFloat(precoLimpo).toFixed(2));
+        
+        // Atualiza a interface (Chama a função que você já tem no seu código)
+        if (typeof carregarCreditos === "function") {
+            carregarCreditos();
+        } else {
+            // Caso não tenha carregarCreditos, usa a atualizarDisplay diretamente
+            atualizarDisplayCreditos(parseInt(novoCredito), parseFloat(valorLimpo));
+        }
+        
+        alert(`✅ Configurações atualizadas!\nAgora cada renovação somará R$ ${parseFloat(precoLimpo).toFixed(2)}`);
+    } else {
+        alert("❌ Por favor, insira apenas números válidos.");
+    }
+}
+
+function configurarValorMensalidade() {
+    // Busca o valor atual ou assume 9.00 como padrão
+    const valorAtual = localStorage.getItem("valor_mensalidade_personalizado") || "9.00";
+    
+    const novoValor = prompt("Defina o valor que você cobra por mês de cada cliente (ex: 15.00):", valorAtual);
+    
+    if (novoValor === null) return; // Cancelou
 
     const valorLimpo = novoValor.replace(',', '.');
 
-    if (!isNaN(novoCredito) && !isNaN(valorLimpo)) {
-        localStorage.setItem("meus_creditos", parseInt(novoCredito));
-        localStorage.setItem("valor_acumulado", parseFloat(valorLimpo).toFixed(2));
-        
-        carregarCreditos(); // Recarrega os displays
-        mostrarToast("Saldos atualizados manualmente!", "info");
+    if (!isNaN(valorLimpo) && parseFloat(valorLimpo) > 0) {
+        localStorage.setItem("valor_mensalidade_personalizado", parseFloat(valorLimpo).toFixed(2));
+        mostrarToast(`Preço atualizado para R$ ${parseFloat(valorLimpo).toFixed(2)}`, "success");
     } else {
-        alert("Por favor, insira números válidos.");
+        alert("Por favor, insira um valor numérico válido.");
     }
 }
