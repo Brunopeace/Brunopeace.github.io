@@ -1,16 +1,14 @@
 // ===============================
-// 1 — REGISTRAR O SW PRINCIPAL DO PWA (CORRETO PARA GITHUB PAGES)
+// 1 — REGISTRAR O SW PRINCIPAL DO PWA
 // ===============================
 
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-        // Registro do SW Principal do PWA
+      
         navigator.serviceWorker.register("service-worker.js")
             .then(reg => {
                 console.log("✅ SW PRINCIPAL registrado:", reg);
 
-                // Registro do SW do Firebase na RAIZ
-                // Removendo o 'scope' ele assume a raiz por padrão
                 return navigator.serviceWorker.register("firebase-messaging-sw.js");
             })
             .then(reg2 => {
@@ -318,37 +316,30 @@ function restaurarCliente(nome) {
     const lixeira = carregarLixeira();
     const clientes = carregarClientes();
     
-    // Busca o cliente na lixeira pelo nome
     const clienteIndex = lixeira.findIndex(c => c.nome.toLowerCase() === nome.toLowerCase());
 
     if (clienteIndex !== -1) {
-        // 1. Remove da lixeira e guarda o objeto do cliente
+
         const clienteParaRestaurar = lixeira.splice(clienteIndex, 1)[0];
 
-        // 2. Adiciona de volta à lista principal de clientes
         clientes.push(clienteParaRestaurar);
         
-        // 3. Salva as alterações localmente
         salvarClientes(clientes);
         salvarLixeira(lixeira);
 
-        // 4. SINCRONIZA COM O FIREBASE
-        // Isso fará com que o cliente "reapareça" no banco de dados
         atualizarDataNoFirebase(clienteParaRestaurar)
             .then(() => {
                 console.log("✅ Cliente restaurado com sucesso no Firebase!");
                 
-                // 5. Atualiza a interface
                 carregarLixeiraPagina();
                 atualizarInfoClientes();
                 atualizarTabelaClientes();
                 
-                // Recarrega para garantir que tudo esteja atualizado
                 window.location.reload();
             })
             .catch(err => {
                 console.error("❌ Erro ao restaurar no Firebase:", err);
-                // Mesmo com erro no Firebase, recarregamos para mostrar o local
+                
                 window.location.reload();
             });
     } else {
@@ -397,10 +388,8 @@ function excluirCliente(nome) {
             somExclusao.play();
         } catch (e) { console.log("Som não encontrado"); }
 
-        // 2. Remove do array principal e guarda o cliente removido
         const clienteRemovido = clientes.splice(clienteIndex, 1)[0];
         
-        // 3. Salva a lista principal atualizada (sem o cliente) no LocalStorage
         salvarClientes(clientes);
 
         // 4. MOVE PARA A LIXEIRA
@@ -408,15 +397,11 @@ function excluirCliente(nome) {
         lixeira.push(clienteRemovido);
         salvarLixeira(lixeira);
 
-        // 5. Limpezas adicionais (Renovados e Firebase)
         removerDeRenovadosHoje(nome);
         
-        // Chamamos a função de remover do Firebase
-        // IMPORTANTE: Use o nome correto da sua função (removerClienteDoFirebase ou excluirClienteDoFirebase)
         removerClienteDoFirebase(nome).then(() => {
             console.log("✅ Removido do Firebase e movido para lixeira");
             
-            // 6. Efeito visual e recarregamento
             const linhaCliente = document.querySelector(`tr[data-nome="${nome.toLowerCase()}"]`);
             if (linhaCliente) {
                 linhaCliente.classList.add('desintegrate');
@@ -434,10 +419,9 @@ function excluirCliente(nome) {
 }
 
 function removerClienteDoFirebase(nomeCliente) {
-    const idDono = obterIdDono(); // Pega o telefone (ex: 81982258462)
+    const idDono = obterIdDono();
     const idCliente = gerarIdFirebase(nomeCliente);
     
-    // Caminho exato na nova estrutura: usuarios -> TELEFONE -> clientes -> NOME
     const caminho = 'usuarios/' + idDono + '/clientes/' + idCliente;
 
     return firebase.database().ref(caminho).remove()
@@ -475,22 +459,19 @@ async function restaurarSelecionados() {
     const lixeira = carregarLixeira();
     let clientes = carregarClientes();
     
-    let promessasFirebase = []; // Array para guardar as tarefas do Firebase
+    let promessasFirebase = [];
     let nomesRestaurados = [];
 
     checkboxes.forEach(checkbox => {
         const nome = checkbox.getAttribute('data-nome');
         const clienteIndex = lixeira.findIndex(c => c.nome.toLowerCase() === nome.toLowerCase());
         
-        // Verifica se o cliente existe na lixeira e se NÃO existe um igual na lista ativa
         if (clienteIndex !== -1 && !clientes.some(c => c.nome.toLowerCase() === nome.toLowerCase())) {
             const cliente = lixeira.splice(clienteIndex, 1)[0];
             
-            // Adiciona à lista local
             clientes.push(cliente);
             nomesRestaurados.push(cliente.nome);
 
-            // Prepara a tarefa para o Firebase
             if (typeof atualizarDataNoFirebase === "function") {
                 promessasFirebase.push(atualizarDataNoFirebase(cliente));
             }
@@ -498,22 +479,20 @@ async function restaurarSelecionados() {
     });
 
     if (nomesRestaurados.length > 0) {
-        // 1. Salva as listas atualizadas no LocalStorage
+
         salvarClientes(clientes);
         salvarLixeira(lixeira);
 
         try {
-            // 2. Aguarda todos os clientes serem salvos no Firebase
+         
             await Promise.all(promessasFirebase);
             
             exibirFeedback(`${nomesRestaurados.length} cliente(s) restaurado(s) com sucesso no Firebase! ✅`);
             
-            // 3. Atualiza a interface
             carregarLixeiraPagina();
             atualizarInfoClientes();
             atualizarTabelaClientes();
             
-            // Recarrega para limpar os checkboxes e atualizar tudo
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
@@ -572,7 +551,6 @@ async function adicionarCliente() {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    // Cálculo de meses
     let diffMeses = (dataSelecionada.getFullYear() - hoje.getFullYear()) * 12;
     diffMeses += dataSelecionada.getMonth() - hoje.getMonth();
 
@@ -659,7 +637,6 @@ function formatarTelefone(telefone) {
     return validarTelefone(numeroLimpo) ? `+55${numeroLimpo}` : "Número inválido";
 }
 
-// Formata o telefone no padrão brasileiro amigável: (11) 91234-5678
 function formatarTelefoneAmigavel(telefone) {
     const numeroLimpo = telefone.replace(/\D/g, '');
 
@@ -672,7 +649,6 @@ function formatarTelefoneAmigavel(telefone) {
     return `(${ddd}) ${parte1}-${parte2}`;
 }
 
-// Exibe uma mensagem de erro visual ao lado do input
 function exibirErro(input, mensagem) {
     let erroSpan = input.parentNode.querySelector(".erro-mensagem");
 
@@ -686,7 +662,6 @@ function exibirErro(input, mensagem) {
     input.classList.add("input-erro");
 }
 
-// Função para limpar o erro do input
 function limparErro(input) {
     const erroSpan = input.nextElementSibling;
     if (erroSpan && erroSpan.classList.contains("erro-mensagem")) {
@@ -708,20 +683,19 @@ function calcularDataVencimento(data) {
         dataVencimento = new Date(ano, mes + 1, 0);
     }
 
-    // RETORNE COMO STRING PARA O FIREBASE ACEITAR
     return dataVencimento.toLocaleDateString('pt-BR'); 
 }
 
 function gerarIdFirebase(nome) {
     return nome.toLowerCase()
-        .replace(/\s+/g, '') // remove espaços
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-        .replace(/[.#$/[\]]/g, ''); // remove caracteres inválidos para o Firebase
+        .replace(/\s+/g, '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[.#$/[\]]/g, '');
 }
 
 function atualizarCorCelulaData(celulaData, data, hora, telefone, todosClientes = []) {
     let dv;
-    // 1. Conversão da data para objeto Date (Tratamento de String BR ou Date padrão)
+    
     if (typeof data === 'string' && data.includes('/')) {
         const [dia, mes, ano] = data.split('/');
         dv = new Date(ano, mes - 1, dia);
@@ -729,7 +703,7 @@ function atualizarCorCelulaData(celulaData, data, hora, telefone, todosClientes 
         dv = new Date(data);
     }
 
-    // 2. Configura a hora exata para o cálculo de precisão
+    
     if (hora && hora.includes(':')) {
         const [h, m] = hora.split(":");
         dv.setHours(parseInt(h), parseInt(m), 0, 0);
@@ -745,35 +719,31 @@ function atualizarCorCelulaData(celulaData, data, hora, telefone, todosClientes 
     dvZerada.setHours(0, 0, 0, 0);
     const diffDias = Math.round((dvZerada - hojeZerado) / (1000 * 60 * 60 * 24));
 
-    // 3. Limpa classes de cores e estilos de borda anteriores para evitar conflitos
     celulaData.classList.remove('red', 'yellow', 'orange');
     celulaData.style.border = "none";
     celulaData.style.borderRadius = "0";
 
-    // 4. IMPLEMENTAÇÃO ESPECÍFICA: Borda vermelha para duplicados que vencem em 2 dias
     if (telefone && todosClientes.length > 0) {
-        // Filtra na lista completa para ver se o telefone se repete
+
         const duplicados = todosClientes.filter(c => c.telefone === telefone);
         
-        // REGRA: Se houver mais de 1 registro com o mesmo número E faltarem exatamente 2 dias
         if (duplicados.length > 1 && diffDias === 2) {
-            celulaData.style.border = "2px solid #7d0000"; // Aplica a borda vermelha viva
+            celulaData.style.border = "2px solid #00ff00";
             celulaData.style.borderRadius = "4px";
             celulaData.title = "Atenção: Este número está duplicado e vence em 2 dias!";
         }
     }
 
-    // 5. Lógica de cores de fundo (Original)
     if (agora > dv) {
-        // Já venceu (passou da hora ou do dia)
+        
         celulaData.classList.add('red');
     } 
     else if (diffDias === 0) {
-        // Vence hoje
+        
         celulaData.classList.add('yellow');
     } 
     else if (diffDias === 2) {
-        // Faltam 2 dias (Aqui a borda vermelha aparecerá se for duplicado)
+       
         celulaData.classList.add('orange');
     }
 }
@@ -782,16 +752,14 @@ function atualizarTabelaOrdenada() {
     const tabela = document.getElementById('corpoTabela');
     if (!tabela) return;
 
-    // 1. Carrega a lista do LocalStorage para ordenação e verificação de duplicados
     let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
     const agora = new Date();
     const hojeZerado = new Date();
     hojeZerado.setHours(0, 0, 0, 0);
 
-    // 2. Define a prioridade visual (Quem aparece primeiro)
     const obterPrioridade = (cliente) => {
         let dv;
-        // Tratamento de data no formato string BR (DD/MM/AAAA)
+        
         if (typeof cliente.data === 'string' && cliente.data.includes('/')) {
             const [d, m, a] = cliente.data.split('/');
             dv = new Date(a, m - 1, d);
@@ -799,7 +767,6 @@ function atualizarTabelaOrdenada() {
             dv = new Date(cliente.data);
         }
         
-        // Ajuste da hora para precisão do cálculo de vencimento
         if (cliente.hora && cliente.hora.includes(':')) {
             const [h, min] = cliente.hora.split(':');
             dv.setHours(parseInt(h), parseInt(min), 0, 0);
@@ -811,62 +778,50 @@ function atualizarTabelaOrdenada() {
         dvZerada.setHours(0, 0, 0, 0);
         const diffDias = Math.round((dvZerada - hojeZerado) / (1000 * 60 * 60 * 24));
 
-        // --- DEFINIÇÃO DE PESOS (Ordem de exibição) ---
-        if (agora > dv) return 5;       // Vencidos (vão para o final ou grupo específico)
-        if (diffDias === 2) return 1;   // Faltam 2 dias (Topo da lista - Urgente)
-        if (diffDias === 0) return 2;   // Vence hoje
-        return 3;                       // Outros (Futuros)
+        if (agora > dv) return 5;
+        if (diffDias === 2) return 1;
+        if (diffDias === 0) return 2;
+        return 3;
     };
 
-    // 3. Executa a ordenação
     clientes.sort((a, b) => {
         const pA = obterPrioridade(a);
         const pB = obterPrioridade(b);
 
-        // Primeiro ordena pelo peso (Prioridade)
         if (pA !== pB) return pA - pB;
 
-        // Segundo critério: Data cronológica (Mais antigos primeiro)
         const dA = new Date(a.data);
         const dB = new Date(b.data);
         if (dA.getTime() !== dB.getTime()) return dA - dB;
         
-        // Terceiro critério: Ordem alfabética
         return a.nome.localeCompare(b.nome);
     });
 
-    // 4. Limpa o corpo da tabela para renderizar a nova ordem
     tabela.innerHTML = "";
 
-    // 5. Renderiza as linhas
-    // Passamos 'clientes' (a lista completa) como o último argumento para que 
-    // a função adicionarLinhaTabela possa verificar duplicidade de telefone.
     clientes.forEach(c => {
         adicionarLinhaTabela(
             c.nome, 
             c.telefone, 
             c.data, 
             c.hora || "", 
-            clientes // <--- LISTA COMPLETA ENVIADA AQUI
+            clientes
         );
     });
 }
 
 function carregarPagina() {
-    // 1. Organiza a tabela principal
+   
     atualizarTabelaOrdenada();
 
-    // 2. Atualiza as estatísticas (Total, Vencidos, etc)
     if (typeof atualizarInfoClientes === "function") {
         atualizarInfoClientes();
     }
 
-    // 3. Atualiza a lista de RENOVADOS (no campo infoClientes)
     if (typeof exibirClientesRenovadosHoje === "function") {
         exibirClientesRenovadosHoje();
     }
 
-    // 4. Atualiza a lista de ALTERADOS (no campo infoClientes2)
     if (typeof exibirClientesAlterados === "function") {
         exibirClientesAlterados();
     }
@@ -898,8 +853,6 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
         celulaData.innerText = new Date(data).toLocaleDateString('pt-BR');
     }
 
-    // --- ATUALIZAÇÃO: COR E BORDA DE DUPLICIDADE ---
-    // Passamos o telefone e a listaCompleta para validar se houver duplicata a 2 dias do vencimento
     if (typeof atualizarCorCelulaData === "function") {
         atualizarCorCelulaData(celulaData, data, hora, telefone, listaCompleta);
     }
@@ -1021,7 +974,6 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
 
         const numeroTelefone = telefone.replace(/\D/g, '');
         
-        // O Telegram usa um formato de link um pouco diferente para compartilhar texto
         const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(' ') }&text=${mensagem}`;
         
         window.open(urlTelegramShare, '_blank');
@@ -1097,7 +1049,6 @@ function registrarClienteAlterado(nome) {
         clientesAlterados.push(registroHoje);
     }
 
-    // Salva como objeto {nome: nome} para manter seu padrão antigo
     if (!registroHoje.nomes.some(c => c.nome === nome)) {
         registroHoje.nomes.push({ nome: nome });
         localStorage.setItem('clientesAlterados', JSON.stringify(clientesAlterados));
@@ -1106,7 +1057,7 @@ function registrarClienteAlterado(nome) {
 
 function exibirClientesRenovadosHoje() {
     const hoje = new Date().toLocaleDateString('pt-BR');
-    const campo = document.getElementById('infoClientes'); // <--- ID CORRETO
+    const campo = document.getElementById('infoClientes');
     if (!campo) return;
 
     let dados = JSON.parse(localStorage.getItem('clientesRenovadosHoje'));
@@ -1199,10 +1150,8 @@ function atualizarDataVencimento(nomeCliente, novaData) {
             clienteExistente.data = novaData;
             localStorage.setItem('clientes', JSON.stringify(clientes));
 
-            // ✅ Atualiza no Firebase
             atualizarDataNoFirebase(clienteExistente);
 
-            // Atualiza o histórico
             atualizarClientesAlterados(nomeCliente, dataAnterior, novaDataFormatada);
         }
     }
@@ -1231,7 +1180,6 @@ function atualizarInfoClientes() {
     const infoDiv = document.getElementById('painelContagem');
     if (!infoDiv) return;
 
-    // Monta os dois cards exatamente como na foto
     infoDiv.innerHTML = `
         <div class="card-contagem card-vencidos">
             Clientes vencidos: ${totalVencidos}
@@ -1242,7 +1190,6 @@ function atualizarInfoClientes() {
     `;
 }
 
-// 🔹 Função corrigida para contar clientes tratando a String de data
 function contarClientesPorCondicao(condicaoCallback) {
     const agora = new Date();
     const clientes = carregarClientes();
@@ -1250,7 +1197,6 @@ function contarClientesPorCondicao(condicaoCallback) {
     return clientes.reduce((total, cliente) => {
         let dataVencimento;
 
-        // --- CONVERSÃO DA STRING (DD/MM/AAAA) PARA OBJETO DATE ---
         if (typeof cliente.data === 'string' && cliente.data.includes('/')) {
             const [dia, mes, ano] = cliente.data.split('/');
             dataVencimento = new Date(ano, mes - 1, dia);
@@ -1258,12 +1204,11 @@ function contarClientesPorCondicao(condicaoCallback) {
             dataVencimento = new Date(cliente.data);
         }
 
-        // Se cliente tem hora definida, aplica para precisão
         if (cliente.hora && cliente.hora.includes(':')) {
             const [h, m] = cliente.hora.split(":");
             dataVencimento.setHours(parseInt(h), parseInt(m), 0, 0);
         } else {
-            // Se não tiver hora, considera o final do dia
+           
             dataVencimento.setHours(23, 59, 59, 999);
         }
 
@@ -1282,10 +1227,9 @@ function calcularTotalClientesNaoVencidos() {
 }
 
 function toggleDarkMode() {
-    // Alterna a classe dark-mode
+    
     const isDarkMode = document.body.classList.toggle('dark-mode');
     
-    // Alterna a classe light-mode (se não for dark, é light)
     document.body.classList.toggle('light-mode', !isDarkMode);
 
     const footer = document.querySelector('footer');
@@ -1293,11 +1237,9 @@ function toggleDarkMode() {
         footer.classList.toggle('dark-mode-footer', isDarkMode);
     }
 
-    // Salva a preferência
     localStorage.setItem('dark-mode', isDarkMode);
     localStorage.setItem('dark-mode-user-set', 'true');
 }
-
 
 function aplicarDarkMode(isDarkMode) {
     document.body.classList.toggle('dark-mode', isDarkMode);
@@ -1313,7 +1255,7 @@ function carregarDarkMode() {
     let isDarkMode = localStorage.getItem('dark-mode');
 
     if (isDarkMode === null || isDarkMode === undefined) {
-        // Nenhum tema escolhido ainda
+       
         const horaAtual = new Date().getHours();
         isDarkMode = horaAtual >= 18 || horaAtual < 6;
         localStorage.setItem('dark-mode', isDarkMode);
@@ -1326,7 +1268,7 @@ function carregarDarkMode() {
 }
 
 function verificarBackupDiario() {
-    // Verificar compatibilidade com localStorage e Blob
+    
     if (typeof Storage === "undefined" || typeof Blob === "undefined") {
         mostrarToast("⚠️ Navegador incompatível com backups!", "#f44336");
         return;
@@ -1337,37 +1279,30 @@ function verificarBackupDiario() {
     
     if (ultimoBackup !== hoje) {
         try {
-            // Carregar clientes e lixeira
+            
             const clientes = carregarClientes();
             const lixeira = carregarLixeira();
             
-            // Preparar os dados para backup
             const backupData = {
                 data: hoje,
                 clientes: clientes || [],
                 lixeira: lixeira || []
             };
 
-            // Gerar o arquivo de backup
             const backupJson = JSON.stringify(backupData, null, 2);
             const blob = new Blob([backupJson], { type: "application/json" });
             const url = URL.createObjectURL(blob);
 
-            // Criar um link para download
             const a = document.createElement('a');
             a.href = url;
             a.download = `backup_automatico_${hoje.replace(/\//g, '-')}.json`;
 
-            // Simular o clique para download automático
             a.click();
 
-            // Limpar o URL do blob
             URL.revokeObjectURL(url);
 
-            // Salvar a data do último backup
             localStorage.setItem('ultimoBackup', hoje);
 
-            // Feedback elegante com seu Toast
             if (typeof mostrarToast === "function") {
                 mostrarToast("📦 Backup salvo com sucesso! ✅");
             }
@@ -1401,11 +1336,10 @@ function mostrarMensagemSucesso(mensagem) {
     }, 5000);
 }
 
-// --- EXPORTAR CLIENTES ---
 function exportarClientes() {
     const clientes = carregarClientes();
     const lixeira = carregarLixeira();
-    // Adicionamos o ID do dono no backup para saber de quem é esse arquivo
+
     const idDono = localStorage.getItem("id_dono_app") || "nao_identificado";
     
     const dadosParaExportar = {
@@ -1426,7 +1360,6 @@ function exportarClientes() {
     URL.revokeObjectURL(url);
 }
 
-// --- IMPORTAR CLIENTES ---
 function importarClientes(event) {
     const file = event.target.files[0];
     if (file) {
@@ -1437,7 +1370,6 @@ function importarClientes(event) {
                 let clientesImportados = [];
                 let lixeiraImportada = [];
 
-                // Lógica de detecção do formato do JSON
                 if (Array.isArray(res)) {
                     clientesImportados = res;
                 } else {
@@ -1445,14 +1377,11 @@ function importarClientes(event) {
                     lixeiraImportada = res.lixeira || [];
                 }
 
-                // 1. Antes de tudo, garante que temos um ID de dono definido no navegador
-                // Se não tiver, a função obterIdDono() vai perguntar agora
                 const idDonoAtual = obterIdDono();
 
                 const clientesAtuais = carregarClientes();
                 const lixeiraAtual = carregarLixeira();
 
-                // 2. Processar Clientes Ativos
                 clientesImportados.forEach(novo => {
                     const index = clientesAtuais.findIndex(c => c.nome.toLowerCase() === novo.nome.toLowerCase());
                     if (index !== -1) {
@@ -1464,7 +1393,6 @@ function importarClientes(event) {
                     }
                 });
 
-                // 3. Processar Lixeira
                 lixeiraImportada.forEach(novo => {
                     const index = lixeiraAtual.findIndex(c => c.nome.toLowerCase() === novo.nome.toLowerCase());
                     if (index !== -1) {
@@ -1475,14 +1403,11 @@ function importarClientes(event) {
                     }
                 });
 
-                // 4. Salvar localmente
                 salvarClientes(clientesAtuais);
                 salvarLixeira(lixeiraAtual);
 
-                // 5. Enviar para o Firebase (Na pasta do ID do dono atual)
                 alert("Importando para o Firebase... Aguarde.");
                 
-                // Usamos um loop simples para garantir que cada um seja enviado
                 for (const cliente of clientesAtuais) {
                     await atualizarDataNoFirebase(cliente);
                 }
@@ -1513,12 +1438,11 @@ async function sincronizarDoFirebase() {
     const btn = document.getElementById('syncFirebase');
     let idDono = localStorage.getItem("id_dono_app");
 
-    // Se não tem ID salvo, abre o modal para o usuário digitar
     if (!idDono || idDono === "padrao") {
         const modal = document.getElementById("modalIdDono");
         if (modal) {
             modal.style.display = "flex";
-            // Focamos no input para facilitar a digitação
+
             document.getElementById("inputTelefoneDono").focus();
         } else {
             alert("Erro: Modal de identificação não encontrado no HTML.");
@@ -1526,7 +1450,6 @@ async function sincronizarDoFirebase() {
         return; 
     }
 
-    // Se já tem o ID, prossegue com a busca automática
     realizarBuscaNoFirebase(idDono);
 }
 
@@ -1538,11 +1461,9 @@ async function realizarBuscaNoFirebase(idDono) {
         btn.disabled = true;
         btn.innerText = "Verificando conta...";
         
-        // 1. Busca os dados COMPLETOS do usuário (para pegar senha e pix)
         const snapshot = await firebase.database().ref('usuarios/' + idDono).once('value');
         const usuarioFull = snapshot.val();
 
-        // 2. Validação: Se não encontrou o usuário no banco
         if (!usuarioFull) {
             alert("Nenhum backup encontrado para este número.");
             btn.innerText = textoOriginal;
@@ -1550,14 +1471,12 @@ async function realizarBuscaNoFirebase(idDono) {
             return; 
         }
 
-        // --- BLOCO DE SEGURANÇA: VALIDAÇÃO DE SENHA ---
         const senhaSalva = usuarioFull.senhaSeguranca;
         
-        // Se o usuário tiver uma senha cadastrada no banco, solicitamos ela
         if (senhaSalva) {
             const senhaDigitada = prompt("🔒 Conta Protegida!\n\nDigite sua SENHA DE SEGURANÇA para restaurar seus clientes:");
 
-            if (senhaDigitada === null) { // Usuário clicou em cancelar
+            if (senhaDigitada === null) {
                 btn.innerText = textoOriginal;
                 btn.disabled = false;
                 return;
@@ -1570,12 +1489,10 @@ async function realizarBuscaNoFirebase(idDono) {
                 return;
             }
         }
-        // ----------------------------------------------
 
         btn.innerText = "Restaurando clientes...";
         const dadosFirebase = usuarioFull.clientes;
 
-        // Caso o usuário exista mas a lista de clientes esteja vazia
         if (!dadosFirebase) {
             alert("Você possui um cadastro, mas sua lista de clientes está vazia.");
             localStorage.setItem("id_dono_app", idDono);
@@ -1584,7 +1501,6 @@ async function realizarBuscaNoFirebase(idDono) {
             return;
         }
 
-        // 3. Processamento dos dados (Conversão de datas)
         const novosClientes = [];
         Object.keys(dadosFirebase).forEach(nomeChave => {
             const clienteFb = dadosFirebase[nomeChave];
@@ -1616,10 +1532,8 @@ async function realizarBuscaNoFirebase(idDono) {
             });
         });
 
-        // 4. SUCESSO: Salvamos o ID, o PIX e os Clientes no LocalStorage
         localStorage.setItem("id_dono_app", idDono);
         
-        // Restaura o Pix dele automaticamente
         if (usuarioFull.chavePix) {
             localStorage.setItem("meu_pix", usuarioFull.chavePix);
         }
@@ -1645,7 +1559,7 @@ async function excluirClientesSelecionados() {
     const checkboxes = document.querySelectorAll('.cliente-checkbox:checked');
     const clientes = carregarClientes();
     const lixeira = carregarLixeira();
-    let promessasFirebase = []; // Para armazenar as exclusões do Firebase
+    let promessasFirebase = [];
     let clientesExcluidosContagem = 0;
 
     checkboxes.forEach(checkbox => {
@@ -1656,21 +1570,17 @@ async function excluirClientesSelecionados() {
         const clienteIndex = clientes.findIndex(c => c.nome.toLowerCase() === nome.toLowerCase());
 
         if (clienteIndex !== -1) {
-            // 1. Remove do array principal e guarda o objeto
+            
             const cliente = clientes.splice(clienteIndex, 1)[0];
             
-            // 2. Adiciona à lixeira local
             lixeira.push(cliente);
             
-            // 3. Prepara a exclusão no Firebase
-            // Certifique-se de que o nome da função seja removerClienteDoFirebase ou excluirClienteDoFirebase
             if (typeof removerClienteDoFirebase === "function") {
                 promessasFirebase.push(removerClienteDoFirebase(nome));
             }
             
             clientesExcluidosContagem++;
             
-            // 4. (Opcional) Remove da lista de renovados hoje se estiver lá
             if (typeof removerDeRenovadosHoje === "function") {
                 removerDeRenovadosHoje(nome);
             }
@@ -1678,21 +1588,19 @@ async function excluirClientesSelecionados() {
     });
 
     if (clientesExcluidosContagem > 0) {
-        // Tocar som de exclusão
+        
         try {
             const somExclusao = new Audio('sounds/exclusao.mp3');
             somExclusao.play();
         } catch (e) { console.log("Som não disponível"); }
 
-        // Salva as alterações locais
         salvarClientes(clientes);
         salvarLixeira(lixeira);
 
         try {
-            // Espera o Firebase confirmar a exclusão de todos os selecionados
+          
             await Promise.all(promessasFirebase);
             
-            // Atualiza a interface
             carregarLixeiraPagina();
             atualizarTabelaClientes();
             atualizarInfoClientes();
@@ -1704,7 +1612,6 @@ async function excluirClientesSelecionados() {
                 setTimeout(() => { feedbackElement.style.display = "none"; }, 4000);
             }
 
-            // Recarrega para limpar a seleção e atualizar tudo
             setTimeout(() => {
                 window.location.reload();
             }, 500);
@@ -1727,7 +1634,7 @@ function atualizarDataNoFirebase(cliente) {
     return firebase.database().ref(caminho).set({
         nome: cliente.nome,
         telefone: cliente.telefone,
-        vencimento: cliente.data, // Aqui agora chegará a string "30/03/2026"
+        vencimento: cliente.data,
         hora: cliente.hora || ""   
     }).then(() => {
         console.log("✅ Sincronizado com sucesso!");
@@ -1744,7 +1651,6 @@ function fecharModalCadastro() {
     document.getElementById("modalCadastro").style.display = "none";
 }
 
-// Fecha o modal ao clicar fora dele
 window.onclick = function(event) {
     const modal = document.getElementById("modalCadastro");
     if (event.target === modal) {
@@ -1781,7 +1687,6 @@ async function registrarToken() {
             return;
         }
 
-        // 1. Salva o token no seu banco de dados (na pasta do usuário)
         salvarTokenNoRealtime(token);
 
         if (typeof verificarVencimentosENotificar === "function") {
@@ -1793,19 +1698,16 @@ async function registrarToken() {
     }
 }
 
-// Garante que o registro aconteça ao carregar a página
 window.addEventListener("load", registrarToken);
 
-// Salvar token no Realtime Database
 function salvarTokenNoRealtime(token) {
-    const idDono = obterIdDono(); // Pega o id do dono (seu telefone)
+    const idDono = obterIdDono();
 
     if (!idDono || idDono === "padrao") {
         console.warn("⚠️ Token não salvo: ID do dono não identificado.");
         return;
     }
 
-    // Salva APENAS nas configurações do seu usuário
     firebase.database().ref(`usuarios/${idDono}/config/fcm_token`).set({
         token: token,
         criadoEm: new Date().toISOString()
@@ -1819,14 +1721,13 @@ function salvarTokenNoRealtime(token) {
 }
 
 function verificarVencimentosENotificar() {
-    const clientes = carregarClientes(); // Sua função que busca do LocalStorage
+    const clientes = carregarClientes();
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
     clientes.forEach(cliente => {
         let dataVencimento;
         
-        // Converte "DD/MM/AAAA" para objeto Date
         if (typeof cliente.data === 'string' && cliente.data.includes('/')) {
             const [dia, mes, ano] = cliente.data.split('/');
             dataVencimento = new Date(ano, mes - 1, dia);
@@ -1835,11 +1736,9 @@ function verificarVencimentosENotificar() {
         }
         dataVencimento.setHours(0, 0, 0, 0);
 
-        // Calcula a diferença
         const diffMs = dataVencimento - hoje;
         const diferencaDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-        // Se faltarem exatamente 2 dias
         if (diferencaDias === 2) {
             enviarNotificacaoLocal(cliente.nome);
         }
@@ -1852,7 +1751,7 @@ function enviarNotificacaoLocal(nomeCliente) {
             registration.showNotification("Vencimento em 2 dias! ⏳", {
                 body: `O cliente ${nomeCliente} está próximo do vencimento.`,
                 icon: "/img/icon192.png",
-                tag: `vencimento-${nomeCliente}`, // Evita repetir a mesma notificação
+                tag: `vencimento-${nomeCliente}`,
                 renotify: true
             });
         });
@@ -1864,7 +1763,6 @@ function abrirModalEditar(nome, telefone, data, hora) {
     document.getElementById("editNome").value = nome;
     document.getElementById("editTelefone").value = telefone;
     
-    // Converte data de PT-BR (DD/MM/AAAA) para o formato do input date (AAAA-MM-DD)
     const partes = data.split('/');
     if(partes.length === 3) {
         const dataFormatada = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
@@ -1929,14 +1827,13 @@ function salvarEdicaoCliente() {
                     
                     mensagensFeedback.push(`Renovado (${diffMeses}m): -${diffMeses} Créditos | +R$ ${valorTotal.toFixed(2)} ✅`);
                 } else {
-                    // --- AQUI ESTÁ A CORREÇÃO ---
+                    
                     mostrarToast("Renovação cancelada! Alterações não foram salvas.", "#f44336");
-                    return; // Interrompe a função aqui e não salva nada
+                    return;
                 }
             }
         }
 
-        // 2. Mudanças de Nome e Telefone (só chegam aqui se não cancelou)
         if (nomeAntigo.toLowerCase() !== novoNome) {
             mensagensFeedback.push("Nome alterado ✅");
             if (typeof removerClienteDoFirebase === "function") removerClienteDoFirebase(nomeAntigo);
@@ -1947,7 +1844,6 @@ function salvarEdicaoCliente() {
             mensagensFeedback.push("Telefone alterado ✅");
         }
 
-        // Monta e salva o objeto
         const clienteAtualizado = {
             nome: novoNome,
             telefone: novoTelefone,
@@ -2097,17 +1993,15 @@ async function entrarComoNovo() {
             alert("⚠️ Erro: A senha deve ter no mínimo 4 dígitos.");
         }
 
-        // --- 3. CRIAÇÃO DO REGISTRO NO FIREBASE ---
         await userRef.set({
             status: "ativo",
             lastSeen: Date.now(),
             dataExpiracao: "", 
             chavePix: pixInserido,
-            senhaSeguranca: senhaSeguranca, // Senha salva para conferência na restauração
+            senhaSeguranca: senhaSeguranca,
             clientes: {}
         });
 
-        // --- 4. PERSISTÊNCIA LOCAL ---
         localStorage.setItem("id_dono_app", telefone);
         localStorage.setItem("meu_pix", pixInserido);
         
@@ -2134,11 +2028,10 @@ function validarSenhaAdm() {
         document.getElementById("modalSenhaAdm").style.display = "none";
         document.getElementById("modalIdDono").style.display = "none";
         
-        // Segue o fluxo com o número master
         prosseguirSincronizacao(TELEFONE_MASTER);
     } else {
         alert("Senha incorreta. Acesso negado.");
-        // Opcional: limpar o campo de senha
+        
         document.getElementById("inputSenhaAdm").value = "";
     }
 }
@@ -2146,26 +2039,23 @@ function validarSenhaAdm() {
 function fecharModalSenha() {
     const modal = document.getElementById('modalSenhaAdm');
     if (modal) {
-        modal.style.display = 'none'; // Esconde o modal
-        document.getElementById('inputSenhaAdm').value = ''; // Limpa o campo de senha por segurança
+        modal.style.display = 'none';
+        document.getElementById('inputSenhaAdm').value = '';
     }
 }
 
-// Função única para salvar e buscar (evita duplicar código)
 function prosseguirSincronizacao(telefone) {
     localStorage.setItem("id_dono_app", telefone);
     document.getElementById("modalIdDono").style.display = "none";
     realizarBuscaNoFirebase(telefone);
 }
 
-// Adicione isso ao seu script.js
 function atualizarStatusOnline() {
     const idDono = obterIdDono();
     if (idDono === "padrao") return;
 
     const userRef = firebase.database().ref('usuarios/' + idDono);
     
-    // Atualiza o "visto por último" agora
     const reportar = () => {
         userRef.update({
             lastSeen: firebase.database.ServerValue.TIMESTAMP,
@@ -2174,10 +2064,9 @@ function atualizarStatusOnline() {
     };
 
     reportar();
-    // Avisa o servidor a cada 30 segundos que ainda está com a página aberta
+   
     setInterval(reportar, 30000);
 
-    // Se o usuário fechar a aba, tenta marcar como offline (opcional)
     userRef.onDisconnect().update({
         online: false,
         lastSeen: firebase.database.ServerValue.TIMESTAMP
@@ -2195,11 +2084,10 @@ function verificarBloqueioMaster() {
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
         
-        // Converte a data do Firebase (AAAA-MM-DD) para objeto Date
         const dataExp = new Date(dados.dataExpiracao + "T00:00:00");
 
         if (hoje > dataExp) {
-            // BLOQUEIO TOTAL
+            
             document.body.innerHTML = `
                 <div style="height:100vh; background:#121212; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; font-family:sans-serif; padding:20px;">
                     <h1 style="color:#ff4b4b; font-size: 50px;">🔒 ACESSO BLOQUEADO</h1>
@@ -2214,10 +2102,9 @@ function verificarBloqueioMaster() {
     });
 }
 
-// Substitua a sua constante fixa por uma função que busca o valor atualizado
 function obterPrecoMensal() {
     const valorSalvo = localStorage.getItem("valor_mensalidade_personalizado");
-    return valorSalvo ? parseFloat(valorSalvo) : 9.00; // 9.00 é o padrão (default)
+    return valorSalvo ? parseFloat(valorSalvo) : 9.00;
 }
 
 function atualizarDisplayCreditos(quantidade, valorTotal) {
@@ -2237,7 +2124,6 @@ function carregarCreditos() {
     let creditos = localStorage.getItem("meus_creditos");
     let valorAcumulado = localStorage.getItem("valor_acumulado");
     
-    // Inicialização para novos usuários
     if (creditos === null) {
         creditos = 1500;
         localStorage.setItem("meus_creditos", creditos);
@@ -2251,77 +2137,65 @@ function carregarCreditos() {
 }
 
 function deduzirCredito(meses = 1) {
-    // 1. Recupera o preço por mês personalizado (ou usa 9.00 como padrão)
+    
     const PRECO_CONFIGURADO = parseFloat(localStorage.getItem("valor_mensalidade_personalizado")) || 9.00;
 
-    // 2. Recupera o saldo de créditos e o valor total acumulado
     let creditos = parseInt(localStorage.getItem("meus_creditos")) || 0;
     let valorAcumulado = parseFloat(localStorage.getItem("valor_acumulado")) || 0.00;
     
-    // 3. Cálculos baseados no multiplicador de meses e no preço dinâmico
     const totalDesconto = meses;
     const totalGanho = meses * PRECO_CONFIGURADO;
 
-    // 4. Verificação de saldo de créditos
     if (creditos >= totalDesconto) {
-        // Aplica a dedução dos créditos e soma o lucro financeiro
+        
         creditos -= totalDesconto;
         valorAcumulado += totalGanho;
         
-        // 5. Salva os novos valores no LocalStorage
         localStorage.setItem("meus_creditos", creditos);
         localStorage.setItem("valor_acumulado", valorAcumulado.toFixed(2));
         
-        // 6. Atualiza a interface visual (Displays do card de créditos)
         if (typeof atualizarDisplayCreditos === "function") {
             atualizarDisplayCreditos(creditos, valorAcumulado);
         }
         
-        // Feedback personalizado para o usuário
         const msg = meses > 1 
             ? `✅ Renovação de ${meses} meses: -${totalDesconto} créditos e +R$ ${totalGanho.toFixed(2)}` 
             : `✅ Cliente renovado! +R$ ${PRECO_CONFIGURADO.toFixed(2)}`;
             
         mostrarToast(msg, "success");
     } else {
-        // Caso o revendedor esteja sem saldo de créditos
+        
         mostrarToast(`❌ Saldo insuficiente! Você precisa de ${totalDesconto} créditos.`, "error");
     }
 }
 
 function editarCreditos() {
-    // 1. Recupera os valores atuais ou define padrões
+    
     const credAtuais = localStorage.getItem("meus_creditos") || 1500;
     const valorAcumuladoAtual = localStorage.getItem("valor_acumulado") || "0.00";
     const precoUnitarioAtual = localStorage.getItem("valor_mensalidade_personalizado") || "9.00";
 
-    // 2. Pergunta a nova quantidade de créditos
     const novoCredito = prompt("💎 QUANTIDADE DE CRÉDITOS:\nDigite o saldo de créditos atual:", credAtuais);
     if (novoCredito === null) return;
 
-    // 3. Pergunta o novo valor acumulado em R$
     const novoValorAcumulado = prompt("💰 VALOR ACUMULADO (R$):\nDigite o total já ganho (ex: 150.00):", valorAcumuladoAtual);
     if (novoValorAcumulado === null) return;
 
-    // 4. Pergunta o preço que ele cobra por cada mês (O valor unitário)
-    const novoPrecoUnitario = prompt("🏷️ VALOR DA MENSALIDADE (R$):\nQuanto você cobra por mês de cada cliente?", precoUnitarioAtual);
+    const novoPrecoUnitario = prompt("🏷️ VALOR DA MENSALIDADE (R$):\nQuanto você cobra por mês de cada crédito?", precoUnitarioAtual);
     if (novoPrecoUnitario === null) return;
 
-    // Limpeza de vírgulas por pontos
     const valorLimpo = novoValorAcumulado.replace(',', '.');
     const precoLimpo = novoPrecoUnitario.replace(',', '.');
 
-    // 5. Validação e Salvamento
     if (!isNaN(novoCredito) && !isNaN(valorLimpo) && !isNaN(precoLimpo)) {
         localStorage.setItem("meus_creditos", parseInt(novoCredito));
         localStorage.setItem("valor_acumulado", parseFloat(valorLimpo).toFixed(2));
         localStorage.setItem("valor_mensalidade_personalizado", parseFloat(precoLimpo).toFixed(2));
         
-        // Atualiza a interface (Chama a função que você já tem no seu código)
         if (typeof carregarCreditos === "function") {
             carregarCreditos();
         } else {
-            // Caso não tenha carregarCreditos, usa a atualizarDisplay diretamente
+            
             atualizarDisplayCreditos(parseInt(novoCredito), parseFloat(valorLimpo));
         }
         
@@ -2332,12 +2206,12 @@ function editarCreditos() {
 }
 
 function configurarValorMensalidade() {
-    // Busca o valor atual ou assume 9.00 como padrão
+    
     const valorAtual = localStorage.getItem("valor_mensalidade_personalizado") || "9.00";
     
     const novoValor = prompt("Defina o valor que você cobra por mês de cada cliente (ex: 15.00):", valorAtual);
     
-    if (novoValor === null) return; // Cancelou
+    if (novoValor === null) return;
 
     const valorLimpo = novoValor.replace(',', '.');
 
