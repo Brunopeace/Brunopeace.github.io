@@ -904,13 +904,43 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
             return;
         }
 
-        const mensagem = criarMensagemWhatsApp(saudacao, dataVencimento);
-        abrirWhatsApp(telefoneCliente, mensagem);
-        marcarMensagemEnviada(nomeCliente, botaoWhatsApp);
+        // --- FILTRAGEM DE USUÁRIOS QUE VENCEM EM EXATAMENTE 2 DIAS ---
+        let usuariosVencendoEmDoisDias = [];
+        if (Array.isArray(listaCompleta) && listaCompleta.length > 0) {
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0); 
+
+            usuariosVencendoEmDoisDias = listaCompleta.filter(c => {
+                const telLimpo = c.telefone ? c.telefone.replace(/\D/g, '') : '';
+                if (telLimpo !== telefoneCliente) return false;
+
+                let dataVenc = null;
+                if (typeof c.data === 'string' && c.data.includes('/')) {
+                    const partes = c.data.split('/');
+                    dataVenc = new Date(partes[2], partes[1] - 1, partes[0]);
+                } else {
+                    dataVenc = new Date(c.data);
+                }
+
+                if (isNaN(dataVenc.getTime())) return false;
+                dataVenc.setHours(0, 0, 0, 0);
+
+                const diferencaTempo = dataVenc.getTime() - hoje.getTime();
+                const diferencaDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
+
+                return diferencaDias === 2;
+            });
+        }
+
+        const mensagem = criarMensagemWhatsApp(saudacao, dataVencimento, usuariosVencendoEmDoisDias);
+        abrirWhatsApp(telefoneCliente, mensagem); 
+        
+        // 🚀 NOVIDADE: Passa a lista de usuários afetados para marcar todos
+        marcarListaComoEnviada(usuariosVencendoEmDoisDias);
     };
 
-    // Auxiliar: Marcar como enviado
-    function marcarMensagemEnviada(nomeCliente, botao) {
+    // Auxiliar Atualizado: Salva todos os usuários e atualiza os botões visíveis na tela
+    function marcarListaComoEnviada(listaUsuarios) {
         const hojeLocal = new Date().toLocaleDateString('pt-BR');
         let mensagens = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: hojeLocal, nomes: [] };
 
@@ -918,19 +948,33 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
             mensagens = { data: hojeLocal, nomes: [] }; 
         }
 
-        if (!mensagens.nomes.includes(nomeCliente)) {
-            mensagens.nomes.push(nomeCliente);
-            localStorage.setItem('mensagensEnviadasHoje', JSON.stringify(mensagens));
-        }
+        // Adiciona o nome de cada usuário filtrado no LocalStorage
+        listaUsuarios.forEach(user => {
+            const nomeFormatado = user.nome.toLowerCase();
+            if (!mensagens.nomes.includes(nomeFormatado)) {
+                mensagens.nomes.push(nomeFormatado);
+            }
+        });
 
-        botao.innerText = "✅ Enviado";
-        botao.disabled = true;
-        botao.style.opacity = "0.6";
+        localStorage.setItem('mensagensEnviadasHoje', JSON.stringify(mensagens));
+
+        // Procura na tabela do app todas as linhas correspondentes e desativa os botões em tempo real
+        listaUsuarios.forEach(user => {
+            const nomeProcurado = user.nome.toLowerCase();
+            const linhaDaTabela = document.querySelector(`tr[data-nome="${nomeProcurado}"]`);
+            if (linhaDaTabela) {
+                const btnWhatsLinha = linhaDaTabela.querySelector('.WhatsApp');
+                if (btnWhatsLinha) {
+                    btnWhatsLinha.innerText = "✅ Enviado";
+                    btnWhatsLinha.disabled = true;
+                    btnWhatsLinha.style.opacity = "0.6";
+                }
+            }
+        });
     }
 
     conteudoDropdown.appendChild(botaoWhatsApp);
 
-    // Auxiliares de Mensagem
     function obterSaudacao() {
         const horaAtual = new Date().getHours();
         if (horaAtual < 12) return "bom dia";
@@ -938,15 +982,27 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
         return "boa noite";
     }
 
-    function criarMensagemWhatsApp(saudacao, dataVencimento) {
+    function criarMensagemWhatsApp(saudacao, dataVencimento, listaUsuarios = []) {
     const pixDoUsuario = localStorage.getItem("meu_pix") || "brunopeaceandlove60@gmail.com";
 
-    return encodeURIComponent(
-        `*Olá, ${saudacao}!* \n\n` +
+    // 1. Início da mensagem com a saudação e o texto padrão
+    let texto = `*Olá, ${saudacao}!* \n\n` +
         `Seu plano de canais está vencendo em *${dataVencimento}*.\n` +
-        `Caso queira renovar após esta data, favor entrar em contato.\n\n` +
-        `*CHAVE PIX:* \n\n ${pixDoUsuario}`
-    );
+        `Caso queira renovar após esta data, favor entrar em contato.\n\n`;
+
+    // 2. Adiciona a Chave Pix no meio da mensagem
+    texto += `*CHAVE PIX:* \n\n ${pixDoUsuario}\n\n`;
+
+    // 3. Adiciona os usuários espaçados logo abaixo da Pix
+    if (listaUsuarios.length > 0) {
+        listaUsuarios.forEach((user, index) => {
+            // O "\n\n" garante a linha em branco separando o Usuário 1 do Usuário 2
+            texto += `\n\nUsuário ${index + 1}:  *${user.nome}*`;
+        });
+        texto += `\n`; // Quebra de linha final para organização
+    }
+
+    return encodeURIComponent(texto);
 }
 
     function abrirWhatsApp(telefone, mensagem) {
@@ -954,32 +1010,61 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
         window.open(url, '_blank');
     }
 
-        // Botão Telegram
+    // Botão Telegram
     const botaoTelegram = document.createElement('button');
     botaoTelegram.innerText = 'Enviar para Telegram';
     botaoTelegram.classList.add('telegram');
     
     botaoTelegram.onclick = function () {
-        const dataVencimentoDestacada = celulaData.innerText;
+        const dataVencimentoDestacada = celulaData.innerText.trim();
         const saudacao = obterSaudacao();
-        
-        // Busca o Pix do usuário logado ou usa o padrão
+        const telefoneCliente = telefone ? telefone.replace(/\D/g, '') : '';
         const pixDoUsuario = localStorage.getItem("meu_pix") || "brunopeaceandlove60@gmail.com";
 
-        const mensagem = encodeURIComponent(
-            `Olá ${saudacao}, seu plano de canais está vencendo, com data de vencimento dia ${dataVencimentoDestacada}. ` +
-            `Caso queira renovar após esta data, favor entrar em contato. \n\n` +
-            `*CHAVE PIX:* \n\n ${pixDoUsuario}`
-        );
+        let usuariosVencendoEmDoisDias = [];
+        if (Array.isArray(listaCompleta) && listaCompleta.length > 0) {
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
 
-        const numeroTelefone = telefone.replace(/\D/g, '');
-        
-        const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(' ') }&text=${mensagem}`;
-        
+            usuariosVencendoEmDoisDias = listaCompleta.filter(c => {
+                const telLimpo = c.telefone ? c.telefone.replace(/\D/g, '') : '';
+                if (telLimpo !== telefoneCliente) return false;
+
+                let dataVenc = null;
+                if (typeof c.data === 'string' && c.data.includes('/')) {
+                    const partes = c.data.split('/');
+                    dataVenc = new Date(partes[2], partes[1] - 1, partes[0]);
+                } else {
+                    dataVenc = new Date(c.data);
+                }
+
+                if (isNaN(dataVenc.getTime())) return false;
+                dataVenc.setHours(0, 0, 0, 0);
+
+                const diferencaTempo = dataVenc.getTime() - hoje.getTime();
+                const diferencaDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
+
+                return diferencaDias === 2;
+            });
+        }
+
+        let textoTelegram = `Olá ${saudacao}, seu plano de canais está vencendo, com data de vencimento dia ${dataVencimentoDestacada}. ` +
+            `Caso queira renovar após esta data, favor entrar em contato. \n\n`;
+
+        if (usuariosVencendoEmDoisDias.length > 0) {
+            textoTelegram += `*Usuários vencendo em 2 dias:*\n`;
+            usuariosVencendoEmDoisDias.forEach((user, index) => {
+                textoTelegram += `Usuário ${index + 1}: ${user.nome}\n`;
+            });
+            textoTelegram += `\n`;
+        }
+
+        textoTelegram += `*CHAVE PIX:* \n\n ${pixDoUsuario}`;
+
+        const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(' ') }&text=${encodeURIComponent(textoTelegram)}`;
         window.open(urlTelegramShare, '_blank');
     };
 
-    // Verifica persistência do botão "Enviado"
     const mensagensEnviadas = JSON.parse(localStorage.getItem('mensagensEnviadasHoje')) || { data: "", nomes: [] };
     const hojeCheck = new Date().toLocaleDateString('pt-BR');
     if (mensagensEnviadas.data === hojeCheck && mensagensEnviadas.nomes.includes(nome.toLowerCase())) {
@@ -2102,6 +2187,36 @@ function verificarBloqueioMaster() {
     });
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function obterPrecoMensal() {
     const valorSalvo = localStorage.getItem("valor_mensalidade_personalizado");
     return valorSalvo ? parseFloat(valorSalvo) : 9.00;
@@ -2209,7 +2324,7 @@ function configurarValorMensalidade() {
     
     const valorAtual = localStorage.getItem("valor_mensalidade_personalizado") || "9.00";
     
-    const novoValor = prompt("Defina o valor que você cobra por mês de cada cliente (ex: 15.00):", valorAtual);
+    const novoValor = prompt("Defina o valor que você cobra por mês de cada Credito (ex: 25.00):", valorAtual);
     
     if (novoValor === null) return;
 
