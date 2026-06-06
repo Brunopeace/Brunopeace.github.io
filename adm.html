@@ -45,17 +45,20 @@
             border-color: #25d366;
          }
          
+        /* Container de Status corrigido com espaçamento automático */
         .status-container {
             display: flex;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
          }
          
         .status-dot {
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            margin-right: 10px;
+            margin-right: 5px;
          }
          
         .online {
@@ -66,6 +69,20 @@
         .offline {
             background: #ff4b4b;
          }
+
+        /* Balão do Nome do Usuário ajustado e com espaçamento interno */
+        .user-name-display {
+            font-size: 0.95rem;
+            color: #ffffff;
+            font-weight: bold;
+            background: #292929;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #444;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-left: auto;
+        }
          
         .info {
             font-size: 0.9rem;
@@ -102,6 +119,21 @@
             flex-wrap: wrap;
          }
          
+        .input-text {
+            background: #121212;
+            border: 1px solid #444;
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+            min-width: 180px;
+            flex: 1;
+        }
+
+        .input-text:focus, .input-data:focus {
+            border-color: #25d366;
+        }
+
         .input-data {
             background: #121212;
             border: 1px solid #444;
@@ -135,6 +167,16 @@
         .btn-excluir:hover {
             background: #cc3a3a;
         }
+
+        /* Ajuste fino para o layout não quebrar em telas de celular */
+        @media (max-width: 480px) {
+            .user-name-display {
+                margin-left: 0;
+                width: 100%;
+                text-align: center;
+                margin-top: 5px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -157,58 +199,70 @@
         const db = firebase.database();
 
         function listarUsuarios() {
-    const grid = document.getElementById('gridUsuarios');
-    db.ref('usuarios').on('value', (snapshot) => {
-        if (!snapshot.exists()) {
-            grid.innerHTML = "Nenhum usuário encontrado.";
-            return;
+            const grid = document.getElementById('gridUsuarios');
+            db.ref('usuarios').on('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    grid.innerHTML = "Nenhum usuário encontrado.";
+                    return;
+                }
+                grid.innerHTML = "";
+                const usuarios = snapshot.val();
+                const agora = Date.now();
+
+                for (let tel in usuarios) {
+                    const user = usuarios[tel];
+                    
+                    // Lógica de Online/Offline (45 segundos)
+                    const isOnline = user.lastSeen && (agora - user.lastSeen < 45000);
+                    
+                    // Captura o nome atual salvo no nó do usuário
+                    const nomeAtual = user.nome || "";
+                    
+                    // Formatação do Último Acesso
+                    const dataUltimoAcesso = user.lastSeen 
+                        ? new Date(user.lastSeen).toLocaleString('pt-BR') 
+                        : "Nunca";
+                        
+                    const dataExpira = user.dataExpiracao || ""; 
+
+                    const card = document.createElement('div');
+                    card.className = 'card-user';
+                    card.innerHTML = `
+                        <div class="status-container">
+                            <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
+                            <strong>${isOnline ? 'USUÁRIO ATIVO' : 'DESCONECTADO'}</strong>
+                            <span class="user-name-display">👤 ${nomeAtual || 'Sem Identificação'}</span>
+                        </div>
+                        <div class="info">
+                            ID: <span class="badge-id">${tel}</span> | 
+                            Expira: <strong class="vitalicio-name">${dataExpira || 'Vitalício'}</strong><br>
+                            <span style="color: #bf8300; font-size: 0.8rem;">
+                                Último acesso: ${dataUltimoAcesso}
+                            </span>
+                        </div>
+                        <div class="admin-actions">
+                            <input type="text" id="nome-${tel}" class="input-text" placeholder="Nome do Usuário" value="${nomeAtual}">
+                            
+                            <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
+                            <button class="btn-salvar" onclick="salvarDadosUsuario('${tel}')">Atualizar</button>
+                            <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Excluir Usuário</button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                }
+            });
         }
-        grid.innerHTML = "";
-        const usuarios = snapshot.val();
-        const agora = Date.now();
 
-        for (let tel in usuarios) {
-            const user = usuarios[tel];
-            
-            // Lógica de Online/Offline (45 segundos)
-            const isOnline = user.lastSeen && (agora - user.lastSeen < 45000);
-            
-            // Formatação do Último Acesso
-            const dataUltimoAcesso = user.lastSeen 
-                ? new Date(user.lastSeen).toLocaleString('pt-BR') 
-                : "Nunca";
-                
-            const dataExpira = user.dataExpiracao || ""; 
-
-            const card = document.createElement('div');
-            card.className = 'card-user';
-            card.innerHTML = `
-                <div class="status-container">
-                    <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
-                    <strong>${isOnline ? 'USUÁRIO ATIVO' : 'DESCONECTADO'}</strong>
-                </div>
-                <div class="info">
-                    ID: <span class="badge-id">${tel}</span> | 
-                    Expira: <strong class="vitalicio-name">${dataExpira || 'Vitalício'}</strong><br>
-                    <span style="color: #bf8300; font-size: 0.8rem;">
-                        Último acesso: ${dataUltimoAcesso}
-                    </span>
-                </div>
-                <div class="admin-actions">
-                    <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
-                    <button class="btn-salvar" onclick="salvarVencimento('${tel}')">Atualizar</button>
-                    <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Excluir Usuário</button>
-                </div>
-            `;
-            grid.appendChild(card);
-        }
-    });
-}
-
-        function salvarVencimento(tel) {
+        // Salva tanto o Vencimento quanto o Nome digitado no Firebase
+        function salvarDadosUsuario(tel) {
+            const novoNome = document.getElementById(`nome-${tel}`).value.trim();
             const novaData = document.getElementById(`exp-${tel}`).value;
-            db.ref('usuarios/' + tel).update({ dataExpiracao: novaData })
-            .then(() => alert("✅ Atualizado!"));
+            
+            db.ref('usuarios/' + tel).update({ 
+                nome: novoNome,
+                dataExpiracao: novaData 
+            })
+            .then(() => alert("✅ Dados salvos com sucesso!"));
         }
 
         function excluirUsuario(tel) {
