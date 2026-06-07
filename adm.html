@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Painel de Gestão - Master</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="img/icon512.png">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -12,13 +13,17 @@
             background: #121212;
             color: white;
             font-family: sans-serif;
-            padding: 20px;
+            padding: 15px;
+            margin: 0;
+            box-sizing: border-box;
          }
          
         h1 {
             color: #25d366;
             border-bottom: 2px solid #333;
             padding-bottom: 10px;
+            font-size: 1.5rem;
+            margin-top: 10px;
          }
          
         .grid-usuarios {
@@ -26,16 +31,15 @@
             flex-direction: column;
             gap: 15px;
             margin-top: 20px;
-            max-height: 80vh;
+            max-height: 85vh;
             overflow-y: auto;
-            padding: 10px;
          }
          
         .card-user {
             background: #1e1e1e;
             border: 1px solid #333;
             padding: 20px;
-            border-radius: 15px;
+            border-radius: 20px;
             transition: 0.3s;
             width: 100%;
             box-sizing: border-box;
@@ -45,20 +49,27 @@
             border-color: #25d366;
          }
          
-        /* Container de Status corrigido com espaçamento automático */
+        /* Container de Status */
         .status-container {
             display: flex;
-            align-items: center;
+            flex-direction: column;
+            align-items: flex-start;
             margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
          }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+        }
          
         .status-dot {
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            margin-right: 5px;
+            margin-right: 10px;
          }
          
         .online {
@@ -70,27 +81,32 @@
             background: #ff4b4b;
          }
 
-        /* Balão do Nome do Usuário ajustado e com espaçamento interno */
+        /* Identificou com o visual exato da foto (Centralizado e Amarelo) */
         .user-name-display {
-            font-size: 0.95rem;
-            color: #ffffff;
+            font-size: 1rem;
+            color: #fffb00;
             font-weight: bold;
             background: #292929;
-            padding: 6px 14px;
-            border-radius: 20px;
-            border: 1px solid #444;
+            padding: 8px 15px;
+            border-radius: 25px;
+            border: 1px solid #3e3e3e;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-left: auto;
+            letter-spacing: 0.8px;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
         }
          
         .info {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             line-height: 1.6;
             color: #ccc;
+            border-bottom: 1px solid #2d2d2d;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
          }
          
-         .vitalicio-name {
+        .vitalicio-name {
              color: #25d366;
          }
          
@@ -98,84 +114,81 @@
             background: #25d366;
             color: #000000;
             padding: 2px 8px;
-            border-radius: 4px;
+            border-radius: 6px;
             font-weight: bold;
-         }
-         
-        .vencimento-info {
-            color: #ff9800;
-            font-weight: bold;
-            display: block;
-            margin: 5px 0;
          }
         
+        /* Ações administrativas organizadas para celular */
         .admin-actions {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+         }
+
+        .inputs-row {
             display: flex;
             gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-         }
+            width: 100%;
+        }
          
         .input-text {
             background: #121212;
             border: 1px solid #444;
             color: white;
-            padding: 8px;
-            border-radius: 6px;
+            padding: 12px;
+            border-radius: 8px;
             outline: none;
-            min-width: 180px;
             flex: 1;
-        }
-
-        .input-text:focus, .input-data:focus {
-            border-color: #25d366;
+            font-size: 0.95rem;
+            width: 50%;
         }
 
         .input-data {
             background: #121212;
             border: 1px solid #444;
             color: white;
-            padding: 8px;
-            border-radius: 6px;
+            padding: 12px;
+            border-radius: 8px;
             outline: none;
+            flex: 1;
+            font-size: 0.95rem;
+            width: 50%;
+            color-scheme: dark; /* Deixa o calendário nativo escuro */
          }
+
+        .input-text:focus, .input-data:focus {
+            border-color: #25d366;
+        }
+
+        .buttons-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
             
         .btn-salvar {
             background: #25d366;
             border: none;
             color: black;
-            padding: 8px 16px;
-            border-radius: 6px;
+            padding: 12px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
+            flex: 1;
+            font-size: 0.95rem;
          }
         
         .btn-excluir { 
             background: #ff4b4b;
             border: none;
             color: white;
-            padding: 8px 16px; 
-            border-radius: 6px;
+            padding: 12px; 
+            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
-            margin-left: auto;
-        }
-        
-        .btn-excluir:hover {
-            background: #cc3a3a;
-        }
-
-        /* Ajuste fino para o layout não quebrar em telas de celular */
-        @media (max-width: 480px) {
-            .user-name-display {
-                margin-left: 0;
-                width: 100%;
-                text-align: center;
-                margin-top: 5px;
-            }
+            flex: 1;
+            font-size: 0.95rem;
         }
     </style>
 </head>
@@ -229,10 +242,13 @@
                     card.className = 'card-user';
                     card.innerHTML = `
                         <div class="status-container">
-                            <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
-                            <strong>${isOnline ? 'USUÁRIO ATIVO' : 'DESCONECTADO'}</strong>
-                            <span class="user-name-display">👤 ${nomeAtual || 'Sem Identificação'}</span>
+                            <div class="status-row">
+                                <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
+                                <strong>${isOnline ? 'USUÁRIO ATIVO' : 'OFF-LINE'}</strong>
+                            </div>
+                            <div class="user-name-display">${nomeAtual || 'Sem Identificação'}</div>
                         </div>
+                        
                         <div class="info">
                             ID: <span class="badge-id">${tel}</span> | 
                             Expira: <strong class="vitalicio-name">${dataExpira || 'Vitalício'}</strong><br>
@@ -240,12 +256,17 @@
                                 Último acesso: ${dataUltimoAcesso}
                             </span>
                         </div>
+                        
                         <div class="admin-actions">
-                            <input type="text" id="nome-${tel}" class="input-text" placeholder="Nome do Usuário" value="${nomeAtual}">
+                            <div class="inputs-row">
+                                <input type="text" id="nome-${tel}" class="input-text" placeholder="Nome do Usuário" value="${nomeAtual}">
+                                <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
+                            </div>
                             
-                            <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
-                            <button class="btn-salvar" onclick="salvarDadosUsuario('${tel}')">Atualizar</button>
-                            <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Excluir Usuário</button>
+                            <div class="buttons-row">
+                                <button class="btn-salvar" onclick="salvarDadosUsuario('${tel}')">Atualizar</button>
+                                <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Excluir Usuário</button>
+                            </div>
                         </div>
                     `;
                     grid.appendChild(card);
@@ -253,7 +274,7 @@
             });
         }
 
-        // Salva tanto o Vencimento quanto o Nome digitado no Firebase
+        // Salva o Vencimento e o Nome no Firebase
         function salvarDadosUsuario(tel) {
             const novoNome = document.getElementById(`nome-${tel}`).value.trim();
             const novaData = document.getElementById(`exp-${tel}`).value;
