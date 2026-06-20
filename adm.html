@@ -10,9 +10,9 @@
     
     <style>
         body {
-            background: #121212;
-            color: white;
-            font-family: sans-serif;
+            background: #0f0f12;
+            color: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             padding: 15px;
             margin: 0;
             box-sizing: border-box;
@@ -20,110 +20,159 @@
          
         h1 {
             color: #25d366;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-            font-size: 1.5rem;
+            border-bottom: 1px solid #222;
+            padding-bottom: 12px;
+            font-size: 1.6rem;
             margin-top: 10px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
          }
          
         .grid-usuarios {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 16px;
             margin-top: 20px;
             max-height: 85vh;
             overflow-y: auto;
          }
          
         .card-user {
-            background: #1e1e1e;
-            border: 1px solid #333;
+            background: #1a1a22;
+            border: 1px solid #2d2d3d;
             padding: 20px;
-            border-radius: 20px;
-            transition: 0.3s;
+            border-radius: 24px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             width: 100%;
             box-sizing: border-box;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
          }
          
         .card-user:hover {
             border-color: #25d366;
+            box-shadow: 0 4px 20px rgba(37, 211, 102, 0.15);
          }
          
-        /* Container de Status */
         .status-container {
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            margin-bottom: 15px;
-            gap: 12px;
+            margin-bottom: 16px;
+            gap: 10px;
          }
 
         .status-row {
             display: flex;
             align-items: center;
-            font-size: 1rem;
-            letter-spacing: 0.5px;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #a1a1aa;
         }
          
         .status-dot {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            margin-right: 10px;
+            margin-right: 8px;
          }
          
         .online {
             background: #25d366;
-            box-shadow: 0 0 10px #25d366;
+            box-shadow: 0 0 12px #25d366;
          }
          
         .offline {
-            background: #ff4b4b;
+            background: #ef4444;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
          }
 
-        /* Identificou com o visual exato da foto (Centralizado e Amarelo) */
+        /* Identificação do Usuário (Visual da Foto - Ajustado) */
         .user-name-display {
-            font-size: 1rem;
+            font-size: 1.05rem;
             color: #fffb00;
-            font-weight: bold;
-            background: #292929;
-            padding: 8px 15px;
-            border-radius: 25px;
-            border: 1px solid #3e3e3e;
+            font-weight: 700;
+            background: #242430;
+            padding: 10px 16px;
+            border-radius: 16px;
+            border: 1px solid #37374a;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 0.5px;
             width: 100%;
             box-sizing: border-box;
             text-align: center;
         }
          
         .info {
-            font-size: 0.95rem;
-            line-height: 1.6;
-            color: #ccc;
-            border-bottom: 1px solid #2d2d2d;
-            padding-bottom: 15px;
-            margin-bottom: 15px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #d1d5db;
+            margin-bottom: 16px;
          }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            background: #20202a;
+            padding: 6px 12px;
+            border-radius: 10px;
+        }
          
         .vitalicio-name {
              color: #25d366;
+             font-weight: 700;
          }
          
         .badge-id {
-            background: #25d366;
-            color: #000000;
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-weight: bold;
+            color: #25d366;
+            font-weight: 700;
          }
+
+        /* 📊 Grid de Clientes em 3 Colunas Estilizadas */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 12px 0 6px 0;
+        }
+
+        .metric-box {
+            background: #20202a;
+            border: 1px solid #2d2d3d;
+            border-radius: 14px;
+            padding: 10px 6px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .value-total { color: #3b82f6; }
+        .value-ativos { color: #25d366; }
+        .value-vencidos { color: #ef4444; }
         
-        /* Ações administrativas organizadas para celular */
+        /* Ações Administrativas */
         .admin-actions {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
             width: 100%;
+            border-top: 1px solid #2d2d3d;
+            padding-top: 16px;
          }
 
         .inputs-row {
@@ -133,32 +182,35 @@
         }
          
         .input-text {
-            background: #121212;
-            border: 1px solid #444;
+            background: #121218;
+            border: 1px solid #37374a;
             color: white;
             padding: 12px;
-            border-radius: 8px;
+            border-radius: 12px;
             outline: none;
             flex: 1;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             width: 50%;
+            transition: 0.2s;
         }
 
         .input-data {
-            background: #121212;
-            border: 1px solid #444;
+            background: #121218;
+            border: 1px solid #37374a;
             color: white;
             padding: 12px;
-            border-radius: 8px;
+            border-radius: 12px;
             outline: none;
             flex: 1;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             width: 50%;
-            color-scheme: dark; /* Deixa o calendário nativo escuro */
+            color-scheme: dark;
+            transition: 0.2s;
          }
 
         .input-text:focus, .input-data:focus {
             border-color: #25d366;
+            background: #161622;
         }
 
         .buttons-row {
@@ -170,25 +222,31 @@
         .btn-salvar {
             background: #25d366;
             border: none;
-            color: black;
-            padding: 12px;
-            border-radius: 8px;
+            color: #0b0b0d;
+            padding: 14px;
+            border-radius: 12px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 700;
             flex: 1;
             font-size: 0.95rem;
+            transition: opacity 0.2s;
          }
         
         .btn-excluir { 
-            background: #ff4b4b;
-            border: none;
-            color: white;
-            padding: 12px; 
-            border-radius: 8px;
+            background: #2d2d3d;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 14px; 
+            border-radius: 12px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 700;
             flex: 1;
             font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .btn-salvar:active, .btn-excluir:active {
+            opacity: 0.8;
         }
     </style>
 </head>
@@ -221,17 +279,37 @@
                 grid.innerHTML = "";
                 const usuarios = snapshot.val();
                 const agora = Date.now();
+                const hojeStr = new Date().toISOString().split('T')[0];
 
                 for (let tel in usuarios) {
                     const user = usuarios[tel];
                     
-                    // Lógica de Online/Offline (45 segundos)
                     const isOnline = user.lastSeen && (agora - user.lastSeen < 45000);
-                    
-                    // Captura o nome atual salvo no nó do usuário
                     const nomeAtual = user.nome || "";
                     
-                    // Formatação do Último Acesso
+                    let totalClientes = 0;
+                    let ativos = 0;
+                    let vencidos = 0;
+
+                    if (user.clientes) {
+                        totalClientes = Object.keys(user.clientes).length;
+                        
+                        for (let clienteId in user.clientes) {
+                            const cliente = user.clientes[clienteId];
+                            const dataVencCliente = cliente.data || cliente.dataExpiracao || "";
+
+                            if (!dataVencCliente) {
+                                ativos++;
+                            } else {
+                                if (dataVencCliente >= hojeStr) {
+                                    ativos++;
+                                } else {
+                                    vencidos++;
+                                }
+                            }
+                        }
+                    }
+                    
                     const dataUltimoAcesso = user.lastSeen 
                         ? new Date(user.lastSeen).toLocaleString('pt-BR') 
                         : "Nunca";
@@ -244,28 +322,52 @@
                         <div class="status-container">
                             <div class="status-row">
                                 <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
-                                <strong>${isOnline ? 'USUÁRIO ATIVO' : 'OFF-LINE'}</strong>
+                                <strong>${isOnline ? 'Usuário Ativo' : 'Offline'}</strong>
                             </div>
                             <div class="user-name-display">${nomeAtual || 'Sem Identificação'}</div>
                         </div>
                         
                         <div class="info">
-                            ID: <span class="badge-id">${tel}</span> | 
-                            Expira: <strong class="vitalicio-name">${dataExpira || 'Vitalício'}</strong><br>
-                            <span style="color: #bf8300; font-size: 0.8rem;">
-                                Último acesso: ${dataUltimoAcesso}
-                            </span>
+                            <div class="info-row">
+                                <span style="color: #9ca3af;">ID do Usuário</span>
+                                <span class="badge-id">${tel}</span>
+                            </div>
+                            <div class="info-row">
+                                <span style="color: #9ca3af;">Expiração</span>
+                                <span class="vitalicio-name">${dataExpira || 'Vitalício'}</span>
+                            </div>
+                            
+                            <div class="metrics-grid">
+                                <div class="metric-box">
+                                    <span class="metric-label">Clientes</span>
+                                    <span class="metric-value value-total">${totalClientes}</span>
+                                </div>
+                                <div class="metric-box">
+                                    <span class="metric-label">Ativos</span>
+                                    <span class="metric-value value-ativos">${ativos}</span>
+                                </div>
+                                <div class="metric-box">
+                                    <span class="metric-label">Vencidos</span>
+                                    <span class="metric-value value-vencidos">${vencidos}</span>
+                                </div>
+                            </div>
+
+                            <div style="text-align: center; margin-top: 10px;">
+                                <span style="color: #bf8300; font-size: 0.8rem; font-weight: 500;">
+                                    ⚡ Visto por último: ${dataUltimoAcesso}
+                                </span>
+                            </div>
                         </div>
                         
                         <div class="admin-actions">
                             <div class="inputs-row">
-                                <input type="text" id="nome-${tel}" class="input-text" placeholder="Nome do Usuário" value="${nomeAtual}">
+                                <input type="text" id="nome-${tel}" class="input-text" placeholder="Mudar Nome" value="${nomeAtual}">
                                 <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
                             </div>
                             
                             <div class="buttons-row">
-                                <button class="btn-salvar" onclick="salvarDadosUsuario('${tel}')">Atualizar</button>
-                                <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Excluir Usuário</button>
+                                <button class="btn-salvar" onclick="salvarDadosUsuario('${tel}')">Salvar</button>
+                                <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Apagar</button>
                             </div>
                         </div>
                     `;
@@ -274,7 +376,6 @@
             });
         }
 
-        // Salva o Vencimento e o Nome no Firebase
         function salvarDadosUsuario(tel) {
             const novoNome = document.getElementById(`nome-${tel}`).value.trim();
             const novaData = document.getElementById(`exp-${tel}`).value;
