@@ -846,9 +846,13 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
 
     const celulaData = novaLinha.insertCell(3);
     
-    // Tratamento de exibição da data
+    // Tratamento seguro de exibição da data na tabela
     if (typeof data === 'string' && data.includes('/')) {
         celulaData.innerText = data;
+    } else if (typeof data === 'string' && data.includes('T')) {
+        // Se vier no formato ISO (2026-06-21T03:00:00.000Z), limpa e exibe em formato BR
+        const apenasData = data.split('T')[0].split('-');
+        celulaData.innerText = `${apenasData[2]}/${apenasData[1]}/${apenasData[0]}`;
     } else {
         celulaData.innerText = new Date(data).toLocaleDateString('pt-BR');
     }
@@ -904,7 +908,7 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
             return;
         }
 
-        // --- FILTRAGEM DE USUÁRIOS QUE VENCEM EM EXATAMENTE 2 DIAS ---
+        // --- 🌟 FILTRAGEM DE USUÁRIOS CORRIGIDA (BLINDADA CONTRA FUSO HORÁRIO) ---
         let usuariosVencendoEmDoisDias = [];
         if (Array.isArray(listaCompleta) && listaCompleta.length > 0) {
             const hoje = new Date();
@@ -914,19 +918,41 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
                 const telLimpo = c.telefone ? c.telefone.replace(/\D/g, '') : '';
                 if (telLimpo !== telefoneCliente) return false;
 
-                let dataVenc = null;
-                if (typeof c.data === 'string' && c.data.includes('/')) {
-                    const partes = c.data.split('/');
-                    dataVenc = new Date(partes[2], partes[1] - 1, partes[0]);
-                } else {
-                    dataVenc = new Date(c.data);
+                let ano, mes, dia;
+                const valorData = c.data || c.vencimento || "";
+
+                if (!valorData) return false;
+
+                // 1. Trata se for formato ISO completo
+                if (valorData.includes('T')) {
+                    const apenasData = valorData.split('T')[0].split('-');
+                    ano = parseInt(apenasData[0], 10);
+                    mes = parseInt(apenasData[1], 10) - 1;
+                    dia = parseInt(apenasData[2], 10);
+                } 
+                // 2. Trata se for formato BR tradicional
+                else if (valorData.includes('/')) {
+                    const partes = valorData.split('/');
+                    dia = parseInt(partes[0], 10);
+                    mes = parseInt(partes[1], 10) - 1;
+                    ano = parseInt(partes[2], 10);
+                }
+                // 3. Trata se for input tipo date americano (AAAA-MM-DD)
+                else if (valorData.includes('-')) {
+                    const partes = valorData.split('-');
+                    ano = parseInt(partes[0], 10);
+                    mes = parseInt(partes[1], 10) - 1;
+                    dia = parseInt(partes[2], 10);
                 }
 
-                if (isNaN(dataVenc.getTime())) return false;
-                dataVenc.setHours(0, 0, 0, 0);
+                if (!ano || isNaN(mes) || !dia) return false;
 
+                // Cria o objeto de data local pura zerada
+                const dataVenc = new Date(ano, mes, dia, 0, 0, 0, 0);
+                
+                // Calcula a diferença exata de dias arredondando com Math.round para evitar quebras por horas
                 const diferencaTempo = dataVenc.getTime() - hoje.getTime();
-                const diferencaDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
+                const diferencaDias = Math.round(diferencaTempo / (1000 * 60 * 60 * 24));
 
                 return diferencaDias === 2;
             });
@@ -935,7 +961,6 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
         const mensagem = criarMensagemWhatsApp(saudacao, dataVencimento, usuariosVencendoEmDoisDias);
         abrirWhatsApp(telefoneCliente, mensagem); 
         
-        // 🚀 NOVIDADE: Passa a lista de usuários afetados para marcar todos
         marcarListaComoEnviada(usuariosVencendoEmDoisDias);
     };
 
@@ -948,7 +973,6 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
             mensagens = { data: hojeLocal, nomes: [] }; 
         }
 
-        // Adiciona o nome de cada usuário filtrado no LocalStorage
         listaUsuarios.forEach(user => {
             const nomeFormatado = user.nome.toLowerCase();
             if (!mensagens.nomes.includes(nomeFormatado)) {
@@ -958,7 +982,6 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
 
         localStorage.setItem('mensagensEnviadasHoje', JSON.stringify(mensagens));
 
-        // Procura na tabela do app todas as linhas correspondentes e desativa os botões em tempo real
         listaUsuarios.forEach(user => {
             const nomeProcurado = user.nome.toLowerCase();
             const linhaDaTabela = document.querySelector(`tr[data-nome="${nomeProcurado}"]`);
@@ -983,27 +1006,23 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
     }
 
     function criarMensagemWhatsApp(saudacao, dataVencimento, listaUsuarios = []) {
-    const pixDoUsuario = localStorage.getItem("meu_pix") || "brunopeaceandlove60@gmail.com";
+        const pixDoUsuario = localStorage.getItem("meu_pix") || "brunopeaceandlove60@gmail.com";
 
-    // 1. Início da mensagem com a saudação e o texto padrão
-    let texto = `*Olá, ${saudacao}!* \n\n` +
-        `Seu plano de canais está vencendo em *${dataVencimento}*.\n` +
-        `Caso queira renovar após esta data, favor entrar em contato.\n\n`;
+        let texto = `*Olá, ${saudacao}!* \n\n` +
+            `Seu plano de canais está vencendo em *${dataVencimento}*.\n` +
+            `Caso queira renovar após esta data, favor entrar em contato.\n\n`;
 
-    // 2. Adiciona a Chave Pix no meio da mensagem
-    texto += `*CHAVE PIX:* \n\n ${pixDoUsuario}\n\n`;
+        texto += `*CHAVE PIX:* \n\n ${pixDoUsuario}\n\n`;
 
-    // 3. Adiciona os usuários espaçados logo abaixo da Pix
-    if (listaUsuarios.length > 0) {
-        listaUsuarios.forEach((user, index) => {
-            // O "\n\n" garante a linha em branco separando o Usuário 1 do Usuário 2
-            texto += `\n\nUsuário ${index + 1}:  *${user.nome}*`;
-        });
-        texto += `\n`; // Quebra de linha final para organização
+        if (listaUsuarios.length > 0) {
+            listaUsuarios.forEach((user, index) => {
+                texto += `\n\nUsuário ${index + 1}:  *${user.nome}*`;
+            });
+            texto += `\n`; 
+        }
+
+        return encodeURIComponent(texto);
     }
-
-    return encodeURIComponent(texto);
-}
 
     function abrirWhatsApp(telefone, mensagem) {
         const url = `https://api.whatsapp.com/send?phone=55${telefone}&text=${mensagem}`;
@@ -1021,6 +1040,7 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
         const telefoneCliente = telefone ? telefone.replace(/\D/g, '') : '';
         const pixDoUsuario = localStorage.getItem("meu_pix") || "brunopeaceandlove60@gmail.com";
 
+        // --- 🌟 FILTRAGEM DE USUÁRIOS IGUALMENTE CORRIGIDA PARA O TELEGRAM ---
         let usuariosVencendoEmDoisDias = [];
         if (Array.isArray(listaCompleta) && listaCompleta.length > 0) {
             const hoje = new Date();
@@ -1030,19 +1050,33 @@ function adicionarLinhaTabela(nome, telefone, data, hora = "", listaCompleta = [
                 const telLimpo = c.telefone ? c.telefone.replace(/\D/g, '') : '';
                 if (telLimpo !== telefoneCliente) return false;
 
-                let dataVenc = null;
-                if (typeof c.data === 'string' && c.data.includes('/')) {
-                    const partes = c.data.split('/');
-                    dataVenc = new Date(partes[2], partes[1] - 1, partes[0]);
-                } else {
-                    dataVenc = new Date(c.data);
+                let ano, mes, dia;
+                const valorData = c.data || c.vencimento || "";
+
+                if (!valorData) return false;
+
+                if (valorData.includes('T')) {
+                    const apenasData = valorData.split('T')[0].split('-');
+                    ano = parseInt(apenasData[0], 10);
+                    mes = parseInt(apenasData[1], 10) - 1;
+                    dia = parseInt(apenasData[2], 10);
+                } else if (valorData.includes('/')) {
+                    const partes = valorData.split('/');
+                    dia = parseInt(partes[0], 10);
+                    mes = parseInt(partes[1], 10) - 1;
+                    ano = parseInt(partes[2], 10);
+                } else if (valorData.includes('-')) {
+                    const partes = valorData.split('-');
+                    ano = parseInt(partes[0], 10);
+                    mes = parseInt(partes[1], 10) - 1;
+                    dia = parseInt(partes[2], 10);
                 }
 
-                if (isNaN(dataVenc.getTime())) return false;
-                dataVenc.setHours(0, 0, 0, 0);
+                if (!ano || isNaN(mes) || !dia) return false;
 
+                const dataVenc = new Date(ano, mes, dia, 0, 0, 0, 0);
                 const diferencaTempo = dataVenc.getTime() - hoje.getTime();
-                const diferencaDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
+                const diferencaDias = Math.round(diferencaTempo / (1000 * 60 * 60 * 24));
 
                 return diferencaDias === 2;
             });
@@ -1352,26 +1386,113 @@ function carregarDarkMode() {
     aplicarDarkMode(isDarkMode);
 }
 
-function verificarBackupDiario() {
+// 📑 Função auxiliar para garantir que as datas salvas no backup fiquem no formato correto DD/MM/AAAA
+function formatarParaBackupDiario(dataString) {
+    if (!dataString) return "";
+
+    // 1. Se contiver o "T" (Formato ISO: 2025-11-20T03:00:00.000Z)
+    if (dataString.includes('T')) {
+        const dataObj = new Date(dataString);
+        if (!isNaN(dataObj.getTime())) {
+            const dataLocal = new Date(dataObj.getTime() + dataObj.getTimezoneOffset() * 60000);
+            const dia = String(dataLocal.getDate()).padStart(2, '0');
+            const mes = String(dataLocal.getMonth() + 1).padStart(2, '0');
+            const ano = dataLocal.getFullYear();
+            return `${dia}/${mes}/${ano}`;
+        }
+    }
     
+    // 2. Se for formato americano puro de input (AAAA-MM-DD)
+    if (dataString.includes('-')) {
+        const partes = dataString.split('-');
+        if (partes.length === 3 && partes[0].length === 4) {
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+    }
+
+    return dataString;
+}
+
+// 📦 FUNÇÃO DE BACKUP INTELIGENTE (Firebase com Fallback para LocalStorage se estiver sem internet)
+async function verificarBackupDiario() {
     if (typeof Storage === "undefined" || typeof Blob === "undefined") {
-        mostrarToast("⚠️ Navegador incompatível com backups!", "#f44336");
+        console.warn("⚠️ Navegador incompatível com backups!");
         return;
     }
 
     const hoje = new Date().toLocaleDateString();
     const ultimoBackup = localStorage.getItem('ultimoBackup');
     
+    // Só executa se for a primeira vez abrindo o app no dia
     if (ultimoBackup !== hoje) {
+        let clientesOriginais = [];
+        let lixeiraOriginal = [];
+        let origemDosDados = "Firebase";
+
+        // Obtém o ID do dono para buscar o nó correto
+        const idDono = localStorage.getItem("id_dono_app") || "nao_identificado";
+
+        // 1. Tenta baixar os dados em tempo real do Firebase primeiro (Se houver internet)
+        if (navigator.onLine && typeof db !== "undefined") {
+            try {
+                // Cria uma promessa com tempo limite (timeout) de 4 segundos para o Firebase não travar a página se a internet estiver oscilando
+                const snapshot = await Promise.race([
+                    db.ref('usuarios/' + idDono).once('value'),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000))
+                ]);
+
+                if (snapshot.exists()) {
+                    const dadosUsuario = snapshot.val();
+                    
+                    // Converte o objeto de clientes do Firebase em uma Array padrão para o backup JSON
+                    if (dadosUsuario.clientes) {
+                        clientesOriginais = Object.keys(dadosUsuario.clientes).map(id => dadosUsuario.clientes[id]);
+                    }
+                    if (dadosUsuario.lixeira) {
+                        lixeiraOriginal = Object.keys(dadosUsuario.lixeira).map(id => dadosUsuario.lixeira[id]);
+                    }
+                }
+            } catch (error) {
+                console.warn("Firebase inacessível ou lento demais. Mudando para o LocalStorage...", error);
+                origemDosDados = "LocalStorage (Modo Offline)";
+            }
+        } else {
+            origemDosDados = "LocalStorage (Dispositivo Offline)";
+        }
+
+        // 2. CASO SEJA OFFLINE OU O FIREBASE FALHE: Carrega os dados salvos localmente
+        if (clientesOriginais.length === 0 && lixeiraOriginal.length === 0) {
+            if (typeof carregarClientes === "function") {
+                clientesOriginais = carregarClientes() || [];
+            }
+            if (typeof carregarLixeira === "function") {
+                lixeiraOriginal = carregarLixeira() || [];
+            }
+        }
+
+        // 3. Executa a limpeza e padronização das datas de segurança
         try {
+            const clientesPadronizados = clientesOriginais.map(cliente => {
+                return {
+                    ...cliente,
+                    data: formatarParaBackupDiario(cliente.data || cliente.vencimento)
+                };
+            });
+
+            const lixeiraPadronizada = lixeiraOriginal.map(cliente => {
+                return {
+                    ...cliente,
+                    data: formatarParaBackupDiario(cliente.data || cliente.vencimento)
+                };
+            });
             
-            const clientes = carregarClientes();
-            const lixeira = carregarLixeira();
-            
+            // Monta a estrutura final do arquivo JSON de Backup
             const backupData = {
-                data: hoje,
-                clientes: clientes || [],
-                lixeira: lixeira || []
+                id_dono: idDono,
+                data_backup: hoje,
+                origem_dos_dados: origemDosDados,
+                clientes: clientesPadronizados,
+                lixeira: lixeiraPadronizada
             };
 
             const backupJson = JSON.stringify(backupData, null, 2);
@@ -1380,26 +1501,27 @@ function verificarBackupDiario() {
 
             const a = document.createElement('a');
             a.href = url;
-            a.download = `backup_automatico_${hoje.replace(/\//g, '-')}.json`;
-
+            a.download = `backup_diario_${hoje.replace(/\//g, '-')}.json`;
             a.click();
 
             URL.revokeObjectURL(url);
 
+            // Salva a flag no LocalStorage para não disparar o download novamente no mesmo dia
             localStorage.setItem('ultimoBackup', hoje);
 
             if (typeof mostrarToast === "function") {
-                mostrarToast("📦 Backup salvo com sucesso! ✅");
+                mostrarToast(`📦 Backup diário (${origemDosDados}) salvo com sucesso! ✅`);
             }
 
         } catch (error) {
-            console.error("Erro ao gerar o backup diário:", error);
+            console.error("Erro crítico ao gerar o backup diário:", error);
             if (typeof mostrarToast === "function") {
-                mostrarToast("❌ Falha no backup automático.", "#f44336");
+                mostrarToast("❌ Falha crítica no backup automático.", "#f44336");
             }
         }
     }
 }
+
 
 // Função para exibir uma mensagem de sucesso
 function mostrarMensagemSucesso(mensagem) {
@@ -1421,17 +1543,63 @@ function mostrarMensagemSucesso(mensagem) {
     }, 5000);
 }
 
+// Função auxiliar interna para garantir que o texto que vai pro JSON seja DD/MM/AAAA
+function formatarParaExportacao(dataString) {
+    if (!dataString) return "";
+
+    // Se a data contiver o "T" (Formato ISO: 2026-04-11T03:00:00.000Z)
+    if (dataString.includes('T')) {
+        const dataObj = new Date(dataString);
+        if (!isNaN(dataObj.getTime())) {
+            // Corrige o fuso horário para pegar o dia correto local
+            const dataLocal = new Date(dataObj.getTime() + dataObj.getTimezoneOffset() * 60000);
+            const dia = String(dataLocal.getDate()).padStart(2, '0');
+            const mes = String(dataLocal.getMonth() + 1).padStart(2, '0');
+            const ano = dataLocal.getFullYear();
+            return `${dia}/${mes}/${ano}`; // Retorna 11/04/2026
+        }
+    }
+    
+    // Se for o formato americano puro (AAAA-MM-DD) convertido por algum input do tipo date
+    if (dataString.includes('-')) {
+        const partes = dataString.split('-');
+        if (partes.length === 3 && partes[0].length === 4) {
+            return `${partes[2]}/${partes[1]}/${partes[0]}`; // Transforma em DD/MM/AAAA
+        }
+    }
+
+    return dataString;
+}
+
 function exportarClientes() {
+    // Carrega as listas originais
     const clientes = carregarClientes();
     const lixeira = carregarLixeira();
 
+    // 🌟 PADRONIZAÇÃO NA EXPORTAÇÃO: Passa limpando a data de cada cliente da lista ativa
+    const clientesPadronizados = clientes.map(cliente => {
+        return {
+            ...cliente,
+            data: formatarParaExportacao(cliente.data)
+        };
+    });
+
+    // 🌟 Passa limpando a data de cada cliente da lixeira também
+    const lixeiraPadronizada = lixeira.map(cliente => {
+        return {
+            ...cliente,
+            data: formatarParaExportacao(cliente.data)
+        };
+    });
+
     const idDono = localStorage.getItem("id_dono_app") || "nao_identificado";
     
+    // Monta o objeto final usando as listas limpas e padronizadas
     const dadosParaExportar = {
         id_dono: idDono,
         data_exportacao: new Date().toISOString(),
-        clientes: clientes,
-        lixeira: lixeira
+        clientes: clientesPadronizados, // Lista corrigida
+        lixeira: lixeiraPadronizada      // Lista corrigida
     };
 
     const jsonClientes = JSON.stringify(dadosParaExportar, null, 2);
@@ -1443,6 +1611,28 @@ function exportarClientes() {
     a.click();
 
     URL.revokeObjectURL(url);
+}
+
+
+// 📑 Adicione essa mini função auxiliar para converter o formato ISO para DD/MM/AAAA caso necessário
+function padronizarDataParaBr(dataString) {
+    if (!dataString) return "";
+
+    // Se a data contiver o "T" (Formato ISO: 2025-11-20T03:00:00.000Z)
+    if (dataString.includes('T')) {
+        const dataObj = new Date(dataString);
+        if (!isNaN(dataObj.getTime())) {
+            // Ajusta o fuso horário para não mudar o dia ao converter
+            const dataLocal = new Date(dataObj.getTime() + dataObj.getTimezoneOffset() * 60000);
+            const dia = String(dataLocal.getDate()).padStart(2, '0');
+            const mes = String(dataLocal.getMonth() + 1).padStart(2, '0');
+            const ano = dataLocal.getFullYear();
+            return `${dia}/${mes}/${ano}`; // Retorna formatado lindamente: 20/11/2025
+        }
+    }
+    
+    // Se já estiver no formato correto ou outro texto, mantém como está
+    return dataString;
 }
 
 function importarClientes(event) {
@@ -1468,17 +1658,23 @@ function importarClientes(event) {
                 const lixeiraAtual = carregarLixeira();
 
                 clientesImportados.forEach(novo => {
+                    // 🌟 PADRONIZAÇÃO AQUI: Garante que a data que está entrando vira DD/MM/AAAA
+                    novo.data = padronizarDataParaBr(novo.data);
+
                     const index = clientesAtuais.findIndex(c => c.nome.toLowerCase() === novo.nome.toLowerCase());
                     if (index !== -1) {
                         clientesAtuais[index].telefone = novo.telefone;
-                        clientesAtuais[index].data = novo.data;
-                        clientesAtuais[index].hora = novo.hora || ""; // Garante a hora
+                        clientesAtuais[index].data = novo.data; // Agora salva limpa
+                        clientesAtuais[index].hora = novo.hora || ""; 
                     } else {
                         clientesAtuais.push(novo);
                     }
                 });
 
                 lixeiraImportada.forEach(novo => {
+                    // 🌟 PADRONIZAÇÃO NA LIXEIRA TAMBÉM
+                    novo.data = padronizarDataParaBr(novo.data);
+
                     const index = lixeiraAtual.findIndex(c => c.nome.toLowerCase() === novo.nome.toLowerCase());
                     if (index !== -1) {
                         lixeiraAtual[index].telefone = novo.telefone;
@@ -1491,7 +1687,7 @@ function importarClientes(event) {
                 salvarClientes(clientesAtuais);
                 salvarLixeira(lixeiraAtual);
 
-                alert("Importando para o Firebase... Aguarde.");
+                alert("Importando e padronizando no Firebase... Aguarde.");
                 
                 for (const cliente of clientesAtuais) {
                     await atualizarDataNoFirebase(cliente);
@@ -1711,6 +1907,8 @@ async function excluirClientesSelecionados() {
     }
 }
 
+
+// parte 1
 function atualizarDataNoFirebase(cliente) {
     const idDono = obterIdDono(); 
     const idCliente = gerarIdFirebase(cliente.nome);
@@ -2186,36 +2384,6 @@ function verificarBloqueioMaster() {
         }
     });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function obterPrecoMensal() {
     const valorSalvo = localStorage.getItem("valor_mensalidade_personalizado");
