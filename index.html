@@ -253,8 +253,21 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       { 
         name: 'sao-joao', 
-        check: (d, m) => m === 6,
+        // 🌟 ATIVAÇÃO EXCLUSIVA: Apenas no dia 24 de Junho
+        check: (d, m) => m === 6 && d === 24,
         action: () => typeof criarSaoJoao === 'function' ? criarSaoJoao() : null
+      },
+      { 
+        name: 'copa-do-brasil', 
+        // 🏆 REGRA SOLICITADA:
+        // Parte 1: 13 de Junho até 23 de Junho
+        // Parte 2: 25 de Junho até 19 de Julho
+        check: (d, m) => {
+          const parte1 = (m === 6 && d >= 13 && d <= 23);
+          const parte2 = (m === 6 && d >= 25) || (m === 7 && d <= 19);
+          return parte1 || parte2;
+        },
+        action: () => criarEfeitosCopa() 
       },
       { 
         name: 'halloween', 
@@ -285,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
           logo.style.maxHeight = "60px"; // Mantém o layout alinhado
         }
         
-        // Aplica o estilo do tema e a ação (neve/fogos), mas não altera a imagem da logo
+        // Aplica o estilo do tema e a ação (neve/fogos/futebol), mas não altera a imagem da logo
         if (temaAtivo) {
           document.body.classList.add(`tema-${temaAtivo.name}`);
           if (typeof temaAtivo.action === 'function') temaAtivo.action();
@@ -443,6 +456,54 @@ function criarPascoa() {
   }, 600);
 }
 
+// Efeitos Visuais Temáticos da Copa do Brasil
+function criarEfeitosCopa() {
+  const container = document.body;
+  const coresCopa = ['#009739', '#FED100', '#002776', '#FFFFFF']; // Verde, Amarelo, Azul e Branco
+  const elementosCopa = ['⚽', '🏆', '🟨', '🟥', '👕'];
+
+  const gerarElementoCopa = () => {
+    if (!document.body.classList.contains('tema-copa-do-brasil')) return;
+    const el = document.createElement("div");
+    
+    // Alterna dinamicamente entre confetes coloridos e emojis de futebol
+    if (Math.random() > 0.4) {
+      Object.assign(el.style, {
+        width: `${Math.random() * 8 + 6}px`,
+        height: `${Math.random() * 12 + 6}px`,
+        backgroundColor: coresCopa[Math.floor(Math.random() * coresCopa.length)],
+        borderRadius: Math.random() > 0.5 ? '50%' : '0px'
+      });
+    } else {
+      el.innerText = elementosCopa[Math.floor(Math.random() * elementosCopa.length)];
+      el.style.fontSize = `${Math.random() * 15 + 18}px`;
+    }
+
+    const duracao = Math.random() * 3 + 3;
+    Object.assign(el.style, {
+      left: `${Math.random() * 100}vw`, position: 'fixed', top: '-40px',
+      zIndex: '9999', pointerEvents: 'none'
+    });
+    
+    container.appendChild(el);
+    
+    el.animate([
+      { transform: `translate3d(0, 0, 0) rotate(0deg)`, opacity: 1 },
+      { transform: `translate3d(${Math.random() * 80 - 40}px, 105vh, 0) rotate(${Math.random() * 720}deg)`, opacity: 0.2 }
+    ], { duration: duracao * 1000, easing: 'linear' });
+
+    setTimeout(() => el.remove(), duracao * 1000);
+  };
+
+  const interval = setInterval(() => {
+    if (!document.body.classList.contains('tema-copa-do-brasil')) { 
+      clearInterval(interval); 
+      return; 
+    }
+    for(let i = 0; i < 3; i++) gerarElementoCopa();
+  }, 450);
+}
+
 function criarHalloween() {
   const container = document.body;
   const elementos = ['👻', '🎃', '🦇', '🕷️', '💀', '🕸️'];
@@ -499,7 +560,7 @@ function criarSaoJoao() {
     gerarEnfeite();
   }, 400);
 }
-
 </script>
+
  </body>
   </html>
