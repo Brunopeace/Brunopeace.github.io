@@ -87,7 +87,6 @@
             box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
          }
 
-        /* Identificação do Usuário (Visual da Foto - Ajustado) */
         .user-name-display {
             font-size: 1.05rem;
             color: #fffb00;
@@ -129,7 +128,6 @@
             font-weight: 700;
          }
 
-        /* 📊 Grid de Clientes em 3 Colunas Estilizadas */
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -165,7 +163,6 @@
         .value-ativos { color: #25d366; }
         .value-vencidos { color: #ef4444; }
         
-        /* Ações Administrativas */
         .admin-actions {
             display: flex;
             flex-direction: column;
@@ -270,111 +267,151 @@
         const db = firebase.database();
 
         function listarUsuarios() {
-            const grid = document.getElementById('gridUsuarios');
-            db.ref('usuarios').on('value', (snapshot) => {
-                if (!snapshot.exists()) {
-                    grid.innerHTML = "Nenhum usuário encontrado.";
-                    return;
-                }
-                grid.innerHTML = "";
-                const usuarios = snapshot.val();
-                const agora = Date.now();
-                const hojeStr = new Date().toISOString().split('T')[0];
+    const grid = document.getElementById('gridUsuarios');
+    db.ref('usuarios').on('value', (snapshot) => {
+        if (!snapshot.exists()) {
+            grid.innerHTML = "Nenhum usuário encontrado.";
+            return;
+        }
+        grid.innerHTML = "";
+        const usuarios = snapshot.val();
+        
+        // 🌟 Captura o momento exato de agora (com horas, minutos e segundos)
+        const agora = new Date();
+        
+        // Data de hoje zerada para calcular a diferença de dias (Laranja/Aviso)
+        const hojeZerado = new Date();
+        hojeZerado.setHours(0, 0, 0, 0);
 
-                for (let tel in usuarios) {
-                    const user = usuarios[tel];
-                    
-                    const isOnline = user.lastSeen && (agora - user.lastSeen < 45000);
-                    const nomeAtual = user.nome || "";
-                    
-                    let totalClientes = 0;
-                    let ativos = 0;
-                    let vencidos = 0;
+        const agoraMilissegundos = Date.now();
 
-                    if (user.clientes) {
-                        totalClientes = Object.keys(user.clientes).length;
-                        
-                        for (let clienteId in user.clientes) {
-                            const cliente = user.clientes[clienteId];
-                            const dataVencCliente = cliente.data || cliente.dataExpiracao || "";
+        for (let tel in usuarios) {
+            const user = usuarios[tel];
+            
+            const isOnline = user.lastSeen && (agoraMilissegundos - user.lastSeen < 45000);
+            const nomeAtual = user.nome || "";
+            
+            let totalClientes = 0;
+            let ativos = 0;
+            let vencidos = 0;
 
-                            if (!dataVencCliente) {
-                                ativos++;
+            if (user.clientes) {
+                const chavesClientes = Object.keys(user.clientes);
+                totalClientes = chavesClientes.length;
+                
+                chavesClientes.forEach(clienteId => {
+                    const cliente = user.clientes[clienteId];
+                    const dataVencCliente = cliente.data || cliente.vencimento || cliente.dataExpiracao || "";
+                    const horaCliente = cliente.hora || "";
+
+                    if (!dataVencCliente) {
+                        vencidos++; 
+                    } else {
+                        let dv = null;
+
+                        // 1. Se for formato ISO (Ex: 2026-06-20T03:00:00.000Z)
+                        if (dataVencCliente.includes('T')) {
+                            const apenasData = dataVencCliente.split('T')[0].split('-');
+                            dv = new Date(parseInt(apenasData[0], 10), parseInt(apenasData[1], 10) - 1, parseInt(apenasData[2], 10));
+                        } 
+                        // 2. Se for formato BR tradicional (Ex: 21/06/2026)
+                        else if (dataVencCliente.includes('/')) {
+                            const partes = dataVencCliente.split('/');
+                            dv = new Date(parseInt(partes[2], 10), parseInt(partes[1], 10) - 1, parseInt(partes[0], 10));
+                        } 
+                        // 3. Se for formato Americano (Ex: 2026-06-21)
+                        else if (dataVencCliente.includes('-')) {
+                            const partes = dataVencCliente.split('-');
+                            dv = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
+                        }
+
+                        if (!dv || isNaN(dv.getTime())) {
+                            vencidos++;
+                        } else {
+                            // 🌟 IGUAL AO GERENCIADOR: Aplica a hora ou define 23:59:59 por padrão
+                            if (horaCliente && horaCliente.includes(':')) {
+                                const [h, m] = horaCliente.split(":");
+                                dv.setHours(parseInt(h), parseInt(m), 0, 0);
                             } else {
-                                if (dataVencCliente >= hojeStr) {
-                                    ativos++;
-                                } else {
-                                    vencidos++;
-                                }
+                                dv.setHours(23, 59, 59, 999);
+                            }
+
+                            // Comparação direta idêntica ao: if (agora > dv) { celulaData.classList.add('red'); }
+                            if (agora > dv) {
+                                vencidos++;
+                            } else {
+                                ativos++;
                             }
                         }
                     }
+                });
+            }
+            
+            const dataUltimoAcesso = user.lastSeen 
+                ? new Date(user.lastSeen).toLocaleString('pt-BR') 
+                : "Nunca";
+                
+            const dataExpira = user.dataExpiracao || ""; 
+
+            const card = document.createElement('div');
+            card.className = 'card-user';
+            card.innerHTML = `
+                <div class="status-container">
+                    <div class="status-row">
+                        <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
+                        <strong>${isOnline ? 'Usuário Ativo' : 'Offline'}</strong>
+                    </div>
+                    <div class="user-name-display">${nomeAtual || 'Sem Identificação'}</div>
+                </div>
+                
+                <div class="info">
+                    <div class="info-row">
+                        <span style="color: #9ca3af;">ID do Usuário</span>
+                        <span class="badge-id">${tel}</span>
+                    </div>
+                    <div class="info-row">
+                        <span style="color: #9ca3af;">Expiração</span>
+                        <span class="vitalicio-name">${dataExpira || 'Vitalício'}</span>
+                    </div>
                     
-                    const dataUltimoAcesso = user.lastSeen 
-                        ? new Date(user.lastSeen).toLocaleString('pt-BR') 
-                        : "Nunca";
-                        
-                    const dataExpira = user.dataExpiracao || ""; 
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <span class="metric-label">Clientes</span>
+                            <span class="metric-value value-total">${totalClientes}</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">Ativos</span>
+                            <span class="metric-value value-ativos">${ativos}</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">Vencidos</span>
+                            <span class="metric-value value-vencidos">${vencidos}</span>
+                        </div>
+                    </div>
 
-                    const card = document.createElement('div');
-                    card.className = 'card-user';
-                    card.innerHTML = `
-                        <div class="status-container">
-                            <div class="status-row">
-                                <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
-                                <strong>${isOnline ? 'Usuário Ativo' : 'Offline'}</strong>
-                            </div>
-                            <div class="user-name-display">${nomeAtual || 'Sem Identificação'}</div>
-                        </div>
-                        
-                        <div class="info">
-                            <div class="info-row">
-                                <span style="color: #9ca3af;">ID do Usuário</span>
-                                <span class="badge-id">${tel}</span>
-                            </div>
-                            <div class="info-row">
-                                <span style="color: #9ca3af;">Expiração</span>
-                                <span class="vitalicio-name">${dataExpira || 'Vitalício'}</span>
-                            </div>
-                            
-                            <div class="metrics-grid">
-                                <div class="metric-box">
-                                    <span class="metric-label">Clientes</span>
-                                    <span class="metric-value value-total">${totalClientes}</span>
-                                </div>
-                                <div class="metric-box">
-                                    <span class="metric-label">Ativos</span>
-                                    <span class="metric-value value-ativos">${ativos}</span>
-                                </div>
-                                <div class="metric-box">
-                                    <span class="metric-label">Vencidos</span>
-                                    <span class="metric-value value-vencidos">${vencidos}</span>
-                                </div>
-                            </div>
-
-                            <div style="text-align: center; margin-top: 10px;">
-                                <span style="color: #bf8300; font-size: 0.8rem; font-weight: 500;">
-                                    ⚡ Visto por último: ${dataUltimoAcesso}
-                                </span>
-                            </div>
-                        </div>
-                        
-                        <div class="admin-actions">
-                            <div class="inputs-row">
-                                <input type="text" id="nome-${tel}" class="input-text" placeholder="Mudar Nome" value="${nomeAtual}">
-                                <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
-                            </div>
-                            
-                            <div class="buttons-row">
-                                <button class="btn-salvar" onclick="salvarDadosUsuario('${tel}')">Salvar</button>
-                                <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Apagar</button>
-                            </div>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-                }
-            });
+                    <div style="text-align: center; margin-top: 10px;">
+                        <span style="color: #bf8300; font-size: 0.8rem; font-weight: 500;">
+                            ⚡ Visto por último: ${dataUltimoAcesso}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="admin-actions">
+                    <div class="inputs-row">
+                        <input type="text" id="nome-${tel}" class="input-text" placeholder="Mudar Nome" value="${nomeAtual}">
+                        <input type="date" id="exp-${tel}" class="input-data" value="${dataExpira}">
+                    </div>
+                    
+                    <div class="buttons-row">
+                        <button class="btn-salvar" onclick="salvarDadosUsuario('${tel}')">Salvar</button>
+                        <button class="btn-excluir" onclick="excluirUsuario('${tel}')">Apagar</button>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
         }
+    });
+}
 
         function salvarDadosUsuario(tel) {
             const novoNome = document.getElementById(`nome-${tel}`).value.trim();
