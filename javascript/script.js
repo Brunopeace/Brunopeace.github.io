@@ -556,6 +556,18 @@ async function adicionarCliente() {
 
     let mesesParaCobrar = diffMeses + 1;
     if (mesesParaCobrar <= 0) mesesParaCobrar = 1;
+
+    // 🔥 TRAVA DE CRÉDITO: Valida e desconta o saldo ANTES de salvar qualquer dado
+    if (typeof deduzirCredito === "function") {
+        const temSaldo = deduzirCredito(mesesParaCobrar);
+        if (!temSaldo) {
+            // Se retornar false (sem saldo), o toast de erro já foi disparado dentro de deduzirCredito.
+            // Paramos a execução aqui e o cliente NÃO é salvo.
+            return; 
+        }
+    }
+
+    // Se chegou aqui, significa que o usuário tinha saldo e o crédito já foi debitado com sucesso!
     const dataVencimento = new Date(partes[0], partes[1] - 1, partes[2]);
     dataVencimento.setMonth(dataVencimento.getMonth() + 1);
 
@@ -571,15 +583,12 @@ async function adicionarCliente() {
         hora: hora 
     };
 
+    // Agora sim, salva com segurança sabendo que foi pago
     clientes.push(novoCliente);
     salvarClientes(clientes);
 
     atualizarDataNoFirebase(novoCliente)
-        .then(async () => {
-            if (typeof deduzirCredito === "function") {
-                await deduzirCredito(mesesParaCobrar); 
-            }
-            
+        .then(() => {
             mostrarToast(`Cadastrado: ${mesesParaCobrar} mês(es) cobrados! ✅`, "success");
             
             setTimeout(() => {
@@ -588,7 +597,7 @@ async function adicionarCliente() {
         })
         .catch((err) => {
             console.error("❌ Erro:", err);
-            mostrarToast("Erro ao salvar.", "error");
+            mostrarToast("Erro ao salvar dados no servidor.", "error");
         });
 }
 
@@ -1522,7 +1531,6 @@ async function verificarBackupDiario() {
     }
 }
 
-
 // Função para exibir uma mensagem de sucesso
 function mostrarMensagemSucesso(mensagem) {
     const mensagemElemento = document.createElement('div');
@@ -1907,8 +1915,6 @@ async function excluirClientesSelecionados() {
     }
 }
 
-
-// parte 1
 function atualizarDataNoFirebase(cliente) {
     const idDono = obterIdDono(); 
     const idCliente = gerarIdFirebase(cliente.nome);
@@ -2094,29 +2100,40 @@ function salvarEdicaoCliente() {
             dataAntigaObj = new Date(partesAntiga[2], partesAntiga[1] - 1, partesAntiga[0]);
         }
 
-        // 1. Verificação de Renovação
+        // 1. Verificação de Renovação e Proteção de Créditos
         if (clienteAnterior.data !== novaDataFormatadaStr) {
             let diffMeses = (dataNovaObj.getFullYear() - dataAntigaObj.getFullYear()) * 12;
             diffMeses += dataNovaObj.getMonth() - dataAntigaObj.getMonth();
 
             if (diffMeses > 0) {
                 const valorTotal = diffMeses * VALOR_POR_MES;
+                
+                // Janela de confirmação antes de gastar
                 const confirmar = confirm(`Renovação: ${diffMeses} mês(es).\nDescontar ${diffMeses} crédito(s) e somar R$ ${valorTotal.toFixed(2)} ao financeiro?`);
                 
                 if (confirmar) {
-                    if (typeof deduzirCredito === "function") deduzirCredito(diffMeses);
+                    // 🔥 IMPLEMENTAÇÃO DA TRAVA: Testa o saldo primeiro
+                    if (typeof deduzirCredito === "function") {
+                        const temSaldo = deduzirCredito(diffMeses);
+                        if (!temSaldo) {
+                            // Se retornar false (sem créditos), para a execução na hora sem salvar nada!
+                            return; 
+                        }
+                    }
+                    
+                    // Se chegou aqui, é porque tinha saldo e o crédito já foi descontado com sucesso!
                     if (typeof adicionarValorAoFinanceiro === "function") adicionarValorAoFinanceiro(valorTotal);
                     if (typeof registrarClienteRenovadoHoje === "function") registrarClienteRenovadoHoje(novoNome);
                     
                     mensagensFeedback.push(`Renovado (${diffMeses}m): -${diffMeses} Créditos | +R$ ${valorTotal.toFixed(2)} ✅`);
                 } else {
-                    
                     mostrarToast("Renovação cancelada! Alterações não foram salvas.", "#f44336");
                     return;
                 }
             }
         }
 
+        // 2. Modificações Adicionais (Nome / Telefone)
         if (nomeAntigo.toLowerCase() !== novoNome) {
             mensagensFeedback.push("Nome alterado ✅");
             if (typeof removerClienteDoFirebase === "function") removerClienteDoFirebase(nomeAntigo);
@@ -2127,6 +2144,7 @@ function salvarEdicaoCliente() {
             mensagensFeedback.push("Telefone alterado ✅");
         }
 
+        // 3. Montagem do objeto atualizado e persistência dos dados
         const clienteAtualizado = {
             nome: novoNome,
             telefone: novoTelefone,
@@ -2138,12 +2156,13 @@ function salvarEdicaoCliente() {
         clientes[clienteIndex] = clienteAtualizado;
         salvarClientes(clientes);
 
+        // Sincroniza com a nuvem (Firebase)
         atualizarDataNoFirebase(clienteAtualizado)
             .then(() => {
                 if (mensagensFeedback.length > 0) {
                     mostrarToast(mensagensFeedback.join(' | '));
                 } else {
-                    mostrarToast("Cliente atualizado! ✅");
+                    mostrarToast("Cliente updated! ✅");
                 }
                 if (typeof atualizarTabelaOrdenada === "function") atualizarTabelaOrdenada();
                 if (typeof exibirClientesRenovadosHoje === "function") exibirClientesRenovadosHoje();
@@ -2302,7 +2321,6 @@ async function entrarComoNovo() {
     }
 }
 
-
 function validarSenhaAdm() {
     const senhaDigitada = document.getElementById("inputSenhaAdm").value;
 
@@ -2420,7 +2438,6 @@ function carregarCreditos() {
 }
 
 function deduzirCredito(meses = 1) {
-    
     const PRECO_CONFIGURADO = parseFloat(localStorage.getItem("valor_mensalidade_personalizado")) || 9.00;
 
     let creditos = parseInt(localStorage.getItem("meus_creditos")) || 0;
@@ -2429,27 +2446,29 @@ function deduzirCredito(meses = 1) {
     const totalDesconto = meses;
     const totalGanho = meses * PRECO_CONFIGURADO;
 
-    if (creditos >= totalDesconto) {
-        
-        creditos -= totalDesconto;
-        valorAcumulado += totalGanho;
-        
-        localStorage.setItem("meus_creditos", creditos);
-        localStorage.setItem("valor_acumulado", valorAcumulado.toFixed(2));
-        
-        if (typeof atualizarDisplayCreditos === "function") {
-            atualizarDisplayCreditos(creditos, valorAcumulado);
-        }
-        
-        const msg = meses > 1 
-            ? `✅ Renovação de ${meses} meses: -${totalDesconto} créditos e +R$ ${totalGanho.toFixed(2)}` 
-            : `✅ Cliente renovado! +R$ ${PRECO_CONFIGURADO.toFixed(2)}`;
-            
-        mostrarToast(msg, "success");
-    } else {
-        
+    // 🛑 Bloqueia se não tiver créditos suficientes
+    if (creditos < totalDesconto) {
         mostrarToast(`❌ Saldo insuficiente! Você precisa de ${totalDesconto} créditos.`, "error");
+        return false; // Retorna falso para avisar o sistema que barrou a operação
     }
+
+    // Se tiver crédito, segue o fluxo normal
+    creditos -= totalDesconto;
+    valorAcumulado += totalGanho;
+    
+    localStorage.setItem("meus_creditos", creditos);
+    localStorage.setItem("valor_acumulado", valorAcumulado.toFixed(2));
+    
+    if (typeof atualizarDisplayCreditos === "function") {
+        atualizarDisplayCreditos(creditos, valorAcumulado);
+    }
+    
+    const msg = meses > 1 
+        ? `✅ Renovação de ${meses} meses: -${totalDesconto} créditos e +R$ ${totalGanho.toFixed(2)}` 
+        : `✅ Cliente renovado! +R$ ${PRECO_CONFIGURADO.toFixed(2)}`;
+        
+    mostrarToast(msg, "success");
+    return true; // Retorna verdadeiro (crédito descontado com sucesso!)
 }
 
 function editarCreditos() {
