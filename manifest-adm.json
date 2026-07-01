@@ -1,8 +1,7 @@
 {
   "name": "Painel de gestao",
   "short_name": "painel",
-  "start_url": "/Brunopeace.github.io/adm.html",
-  "scope": "/Brunopeace.github.io/",
+  "start_url": "adm.html",
   "display": "standalone",
   "icons": [
     {
