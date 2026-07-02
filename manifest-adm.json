@@ -4,7 +4,7 @@
   "id": "/Brunopeace.github.io/painel/",
   "description": "Painel de gestão administrativa.",
   "start_url": "adm.html",
-  "scope": "/Brunopeace.github.io/",
+  
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
